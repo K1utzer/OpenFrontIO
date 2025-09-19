@@ -27,11 +27,13 @@ type RocketConfig = {
 const rocketConfig: Record<RocketUnitType, RocketConfig> = {
   [UnitType.ClusterRocket]: {
     speed: 8,
-    blastRadius: 0,
-    troopDamage: 200,
-    bursts: { min: 7, max: 12 },
-    spread: 18,
-    minClusterSpacing: 6,
+
+    blastRadius: 1,
+    troopDamage: 350,
+    bursts: { min: 3, max: 5 },
+    spread: 26,
+    minClusterSpacing: 10,
+
   },
   [UnitType.TacticalRocket]: {
     speed: 12,
@@ -304,12 +306,14 @@ export class RocketExecution implements Execution {
       : null;
 
     const minSpacing = Math.max(
-      2,
+      4,
       config.minClusterSpacing ?? Math.floor(Math.max(config.spread, 1) / 3),
     );
-    const maxAttempts = desiredBlasts * 50;
+    const minSpacingSquared = minSpacing * minSpacing;
+    const maxAttempts = Math.max(20, desiredBlasts * 60);
 
-    const addIfValid = (tile: TileRef | null) => {
+    const addIfValid = (tile: TileRef | null, enforceSpacing = true) => {
+
       if (tile === null) {
         return false;
       }
@@ -317,8 +321,10 @@ export class RocketExecution implements Execution {
         return false;
       }
       if (
+        enforceSpacing &&
         blasts.some(
-          (existing) => this.mg.manhattanDist(existing, tile) < minSpacing,
+          (existing) =>
+            this.mg.euclideanDistSquared(existing, tile) < minSpacingSquared,
         )
       ) {
         return false;
@@ -328,19 +334,79 @@ export class RocketExecution implements Execution {
       return true;
     };
 
-    addIfValid(this.dst);
+    addIfValid(this.dst, false);
+
+    if (targetOwner !== null && targetOwner.isPlayer()) {
+      const playerOwner = targetOwner;
+      const maxDistanceSquared =
+        config.spread > 0
+          ? config.spread * config.spread
+          : Number.POSITIVE_INFINITY;
+      const ownerTargets: TileRef[] = [];
+      for (const unit of this.mg.units()) {
+        if (!unit.isActive() || unit.owner() !== playerOwner) {
+          continue;
+        }
+        if (
+          unit.type() === UnitType.ClusterRocket ||
+          unit.type() === UnitType.TacticalRocket ||
+          unit.type() === UnitType.MIRVWarhead ||
+          unit.type() === UnitType.MIRV
+        ) {
+          continue;
+        }
+        if (
+          config.spread > 0 &&
+          this.mg.euclideanDistSquared(unit.tile(), this.dst) >
+            maxDistanceSquared
+        ) {
+          continue;
+        }
+        ownerTargets.push(unit.tile());
+      }
+
+      ownerTargets.sort(
+        (a, b) =>
+          this.mg.euclideanDistSquared(b, this.dst) -
+          this.mg.euclideanDistSquared(a, this.dst),
+      );
+
+      for (const tile of ownerTargets) {
+        if (blasts.length >= desiredBlasts) {
+          break;
+        }
+        addIfValid(tile);
+      }
+    }
 
     let attempts = 0;
     while (blasts.length < desiredBlasts && attempts < maxAttempts) {
       attempts++;
+      const ignoreOwner = attempts > maxAttempts / 2;
       const candidate = this.randomClusterTarget(
         baseX,
         baseY,
         config.spread,
-        targetOwner,
+        ignoreOwner ? null : targetOwner,
         preferLand,
       );
       addIfValid(candidate);
+    }
+
+    if (blasts.length < desiredBlasts) {
+      let fallbackAttempts = maxAttempts;
+      while (blasts.length < desiredBlasts && fallbackAttempts > 0) {
+        fallbackAttempts--;
+        const ignoreOwner = fallbackAttempts < maxAttempts / 2;
+        const candidate = this.randomClusterTarget(
+          baseX,
+          baseY,
+          config.spread,
+          ignoreOwner ? null : targetOwner,
+          preferLand,
+        );
+        addIfValid(candidate, false);
+      }
     }
 
     if (blasts.length === 0) {
@@ -365,7 +431,10 @@ export class RocketExecution implements Execution {
     const maxX = baseX + spread;
     const minY = baseY - spread;
     const maxY = baseY + spread;
-    const maxLocalAttempts = 60;
+
+    const maxLocalAttempts = 80;
+    const maxDistanceSquared = spread * spread;
+
 
     for (let tries = 0; tries < maxLocalAttempts; tries++) {
       const x = this.random.nextInt(minX, maxX + 1);
@@ -378,6 +447,14 @@ export class RocketExecution implements Execution {
         continue;
       }
       if (
+
+        spread > 0 &&
+        this.mg.euclideanDistSquared(tile, this.dst) > maxDistanceSquared
+      ) {
+        continue;
+      }
+      if (
+
         targetOwner !== null &&
         targetOwner.isPlayer() &&
         (!this.mg.hasOwner(tile) || this.mg.owner(tile) !== targetOwner)
