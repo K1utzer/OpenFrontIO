@@ -132,6 +132,7 @@ export class AutoUpgradeEvent implements GameEvent {
 export class InputHandler {
   private lastPointerX: number = 0;
   private lastPointerY: number = 0;
+  private pointerPositionKnown = false;
 
   private lastPointerDownX: number = 0;
   private lastPointerDownY: number = 0;
@@ -221,6 +222,9 @@ export class InputHandler {
     window.addEventListener("pointermove", this.onPointerMove.bind(this));
     this.canvas.addEventListener("contextmenu", (e) => this.onContextMenu(e));
     window.addEventListener("mousemove", (e) => {
+      this.lastPointerX = e.clientX;
+      this.lastPointerY = e.clientY;
+      this.pointerPositionKnown = true;
       if (e.movementX || e.movementY) {
         this.eventBus.emit(new MouseMoveEvent(e.clientX, e.clientY));
       }
@@ -331,6 +335,19 @@ export class InputHandler {
       ) {
         this.activeKeys.add(e.code);
       }
+
+      if (this.quickBuildHotkeys.has(e.code)) {
+        e.preventDefault();
+        if (!e.repeat && this.pointerPositionKnown) {
+          const quickBuildType = this.quickBuildHotkeys.get(e.code)!;
+          this.triggerQuickBuild(
+            quickBuildType,
+            this.lastPointerX,
+            this.lastPointerY,
+          );
+          this.activeKeys.delete(e.code);
+        }
+      }
     });
     window.addEventListener("keyup", (e) => {
       if (e.code === this.keybinds.toggleView) {
@@ -405,6 +422,7 @@ export class InputHandler {
     if (this.pointers.size === 1) {
       this.lastPointerX = event.clientX;
       this.lastPointerY = event.clientY;
+      this.pointerPositionKnown = true;
 
       this.lastPointerDownX = event.clientX;
       this.lastPointerDownY = event.clientY;
@@ -431,6 +449,10 @@ export class InputHandler {
     this.pointerDown = false;
     this.pointers.clear();
 
+    this.pointerPositionKnown = true;
+    this.lastPointerX = event.clientX;
+    this.lastPointerY = event.clientY;
+
     if (this.isModifierKeyPressed(event)) {
       this.eventBus.emit(new ShowBuildMenuEvent(event.clientX, event.clientY));
       return;
@@ -448,13 +470,7 @@ export class InputHandler {
         const quickBuildType =
           quickBuildCandidate ?? this.getActiveQuickBuildUnitType();
         if (quickBuildType !== null) {
-          this.lastQuickBuildAttempt = {
-            x: event.clientX,
-            y: event.clientY,
-          };
-          this.eventBus.emit(
-            new QuickBuildEvent(quickBuildType, event.clientX, event.clientY),
-          );
+          this.triggerQuickBuild(quickBuildType, event.clientX, event.clientY);
           return;
         }
       }
@@ -525,6 +541,9 @@ export class InputHandler {
     this.pointers.set(event.pointerId, event);
 
     if (!this.pointerDown) {
+      this.lastPointerX = event.clientX;
+      this.lastPointerY = event.clientY;
+      this.pointerPositionKnown = true;
       this.eventBus.emit(new MouseOverEvent(event.clientX, event.clientY));
       return;
     }
@@ -537,6 +556,7 @@ export class InputHandler {
 
       this.lastPointerX = event.clientX;
       this.lastPointerY = event.clientY;
+      this.pointerPositionKnown = true;
     } else if (this.pointers.size === 2) {
       const currentPinchDistance = this.getPinchDistance();
       const pinchDelta = currentPinchDistance - this.lastPinchDistance;
@@ -620,15 +640,18 @@ export class InputHandler {
     }
     return null;
   }
-
-  destroy() {
-    if (this.moveInterval !== null) {
-      clearInterval(this.moveInterval);
-    }
-    this.eventBus.off(QuickBuildFailedEvent, this.handleQuickBuildFailure);
-    this.activeKeys.clear();
-    this.pendingQuickBuild = null;
-    this.lastQuickBuildAttempt = null;
+  private triggerQuickBuild(
+    unitType: UnitType,
+    clientX: number,
+    clientY: number,
+  ) {
+    this.lastQuickBuildAttempt = {
+      x: clientX,
+      y: clientY,
+    };
+    this.eventBus.emit(new QuickBuildEvent(unitType, clientX, clientY));
+  }
+    this.pointerPositionKnown = false;
   }
 
   isModifierKeyPressed(event: PointerEvent): boolean {

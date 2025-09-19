@@ -41,26 +41,23 @@ describe("InputHandler quick build fallback", () => {
     handler.initialize();
 
     const internal = handler as unknown as {
-      activeKeys: Set<string>;
-      onPointerDown: (event: PointerEvent) => void;
+      onPointerMove: (event: PointerEvent) => void;
     };
 
     const emitSpy = jest.spyOn(eventBus, "emit");
 
-    internal.activeKeys.add("Digit3");
+    const pointerMove = createPointerEvent({ x: 100, y: 120 });
+    internal.onPointerMove(pointerMove);
 
-    const pointerDown = createPointerEvent({ x: 100, y: 120 });
-    internal.onPointerDown(pointerDown);
-
-    const pointerUp = createPointerEvent({ x: 100, y: 120 });
-    handler.onPointerUp(pointerUp);
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit3" }));
 
     const quickBuildCall = emitSpy.mock.calls.find(
       ([event]) => event instanceof QuickBuildEvent,
     );
     expect(quickBuildCall).toBeDefined();
 
-    eventBus.emit(new QuickBuildFailedEvent(pointerUp.x, pointerUp.y));
+    eventBus.emit(new QuickBuildFailedEvent(pointerMove.x, pointerMove.y));
+
 
     const mouseUpCall = emitSpy.mock.calls.find(
       ([event]) => event instanceof MouseUpEvent,
