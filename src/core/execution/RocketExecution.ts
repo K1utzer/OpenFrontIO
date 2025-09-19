@@ -210,7 +210,9 @@ export class RocketExecution implements Execution {
       this.applyBlast(blast, config.blastRadius, config.troopDamage);
     }
 
+
     this.redrawBuildings(config.blastRadius + 4, blasts);
+
 
     this.active = false;
     this.rocket.setReachedTarget();

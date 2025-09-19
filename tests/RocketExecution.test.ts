@@ -5,10 +5,11 @@ import {
   Player,
   PlayerInfo,
   PlayerType,
-  TileRef,
   Unit,
+
   UnitType,
 } from "../src/core/game/Game";
+import { TileRef } from "../src/core/game/GameMap";
 import { setup } from "./util/Setup";
 import { executeTicks } from "./util/utils";
 
@@ -73,6 +74,7 @@ function prepareMissileShip(): {
   missileShipTile: TileRef;
   patrol: TileRef;
   missileShip: Unit;
+
 } {
   const portTile = player1PortTile;
   player1.buildUnit(UnitType.Port, portTile, {});
@@ -92,11 +94,13 @@ function prepareMissileShip(): {
       allowShells: false,
     }),
   );
+
   return {
     missileShipTile: missileShip.tile(),
     patrol: patrolTile,
     missileShip,
   };
+
 }
 
 describe("RocketExecution", () => {
@@ -121,7 +125,9 @@ describe("RocketExecution", () => {
     const city = player2.buildUnit(UnitType.City, player2LandTile, {});
 
     game.addExecution(
+
       new RocketExecution(UnitType.ClusterRocket, player1, player2LandTile),
+
     );
 
     executeTicks(game, 200);
@@ -134,7 +140,9 @@ describe("RocketExecution", () => {
     const { missileShipTile } = prepareMissileShip();
 
     game.addExecution(
+
       new RocketExecution(UnitType.TacticalRocket, player1, player2LandTile),
+
     );
 
     const ownerBefore = game.owner(player2LandTile);
