@@ -2,6 +2,8 @@ import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import warshipIcon from "../../../../resources/images/BattleshipIconWhite.svg";
 import cityIcon from "../../../../resources/images/CityIconWhite.svg";
+import destroyerIcon from "../../../../resources/images/DestroyerIconWhite.svg";
+import explosionIcon from "../../../../resources/images/ExplosionIconWhite.svg";
 import factoryIcon from "../../../../resources/images/FactoryIconWhite.svg";
 import goldCoinIcon from "../../../../resources/images/GoldCoinIcon.svg";
 import mirvIcon from "../../../../resources/images/MIRVIcon.svg";
@@ -11,6 +13,7 @@ import atomBombIcon from "../../../../resources/images/NukeIconWhite.svg";
 import portIcon from "../../../../resources/images/PortIcon.svg";
 import samlauncherIcon from "../../../../resources/images/SamLauncherIconWhite.svg";
 import shieldIcon from "../../../../resources/images/ShieldIconWhite.svg";
+import targetIcon from "../../../../resources/images/TargetIconWhite.svg";
 import { translateText } from "../../../client/Utils";
 import { EventBus } from "../../../core/EventBus";
 import {
@@ -55,6 +58,20 @@ export const buildTable: BuildItemDisplay[][] = [
       countable: false,
     },
     {
+      unitType: UnitType.ClusterRocket,
+      icon: explosionIcon,
+      description: "build_menu.desc.cluster_rocket",
+      key: "unit_type.cluster_rocket",
+      countable: false,
+    },
+    {
+      unitType: UnitType.TacticalRocket,
+      icon: targetIcon,
+      description: "build_menu.desc.tactical_rocket",
+      key: "unit_type.tactical_rocket",
+      countable: false,
+    },
+    {
       unitType: UnitType.MIRV,
       icon: mirvIcon,
       description: "build_menu.desc.mirv",
@@ -73,6 +90,13 @@ export const buildTable: BuildItemDisplay[][] = [
       icon: warshipIcon,
       description: "build_menu.desc.warship",
       key: "unit_type.warship",
+      countable: true,
+    },
+    {
+      unitType: UnitType.MissileShip,
+      icon: destroyerIcon,
+      description: "build_menu.desc.missile_ship",
+      key: "unit_type.missile_ship",
       countable: true,
     },
     {

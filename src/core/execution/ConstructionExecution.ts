@@ -15,6 +15,7 @@ import { MirvExecution } from "./MIRVExecution";
 import { MissileSiloExecution } from "./MissileSiloExecution";
 import { NukeExecution } from "./NukeExecution";
 import { PortExecution } from "./PortExecution";
+import { RocketExecution } from "./RocketExecution";
 import { SAMLauncherExecution } from "./SAMLauncherExecution";
 import { WarshipExecution } from "./WarshipExecution";
 
@@ -107,12 +108,26 @@ export class ConstructionExecution implements Execution {
           new NukeExecution(this.constructionType, player, this.tile),
         );
         break;
+      case UnitType.ClusterRocket:
+      case UnitType.TacticalRocket:
+        this.mg.addExecution(
+          new RocketExecution(this.constructionType, player, this.tile),
+        );
+        break;
       case UnitType.MIRV:
         this.mg.addExecution(new MirvExecution(player, this.tile));
         break;
       case UnitType.Warship:
         this.mg.addExecution(
           new WarshipExecution({ owner: player, patrolTile: this.tile }),
+        );
+        break;
+      case UnitType.MissileShip:
+        this.mg.addExecution(
+          new WarshipExecution(
+            { owner: player, patrolTile: this.tile },
+            { unitType: UnitType.MissileShip, allowShells: false },
+          ),
         );
         break;
       case UnitType.Port:

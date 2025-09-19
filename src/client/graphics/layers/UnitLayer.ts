@@ -93,7 +93,7 @@ export class UnitLayer implements Layer {
 
     // Only select warships owned by the player
     return this.game
-      .units(UnitType.Warship)
+      .units(UnitType.Warship, UnitType.MissileShip)
       .filter(
         (unit) =>
           unit.isActive() &&
@@ -268,6 +268,7 @@ export class UnitLayer implements Layer {
         this.handleBoatEvent(unit);
         break;
       case UnitType.Warship:
+      case UnitType.MissileShip:
         this.handleWarShipEvent(unit);
         break;
       case UnitType.Shell:
@@ -286,6 +287,8 @@ export class UnitLayer implements Layer {
         this.handleMIRVWarhead(unit);
         break;
       case UnitType.AtomBomb:
+      case UnitType.ClusterRocket:
+      case UnitType.TacticalRocket:
       case UnitType.HydrogenBomb:
       case UnitType.MIRV:
         this.handleNuke(unit);

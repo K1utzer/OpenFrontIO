@@ -151,10 +151,13 @@ export interface UnitInfo {
 export enum UnitType {
   TransportShip = "Transport",
   Warship = "Warship",
+  MissileShip = "Missile Ship",
   Shell = "Shell",
   SAMMissile = "SAMMissile",
   Port = "Port",
   AtomBomb = "Atom Bomb",
+  ClusterRocket = "Cluster Rocket",
+  TacticalRocket = "Tactical Rocket",
   HydrogenBomb = "Hydrogen Bomb",
   TradeShip = "Trade Ship",
   MissileSilo = "Missile Silo",
@@ -204,6 +207,10 @@ export interface UnitParamsMap {
     patrolTile: TileRef;
   };
 
+  [UnitType.MissileShip]: {
+    patrolTile: TileRef;
+  };
+
   [UnitType.Shell]: Record<string, never>;
 
   [UnitType.SAMMissile]: Record<string, never>;
@@ -211,6 +218,16 @@ export interface UnitParamsMap {
   [UnitType.Port]: Record<string, never>;
 
   [UnitType.AtomBomb]: {
+    targetTile?: number;
+    trajectory: TrajectoryTile[];
+  };
+
+  [UnitType.ClusterRocket]: {
+    targetTile?: number;
+    trajectory: TrajectoryTile[];
+  };
+
+  [UnitType.TacticalRocket]: {
     targetTile?: number;
     trajectory: TrajectoryTile[];
   };
@@ -257,6 +274,8 @@ export type AllUnitParams = UnitParamsMap[keyof UnitParamsMap];
 
 export const nukeTypes = [
   UnitType.AtomBomb,
+  UnitType.ClusterRocket,
+  UnitType.TacticalRocket,
   UnitType.HydrogenBomb,
   UnitType.MIRVWarhead,
   UnitType.MIRV,

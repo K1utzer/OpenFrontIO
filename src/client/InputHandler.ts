@@ -158,6 +158,9 @@ export class InputHandler {
     ["Digit9", UnitType.Warship],
     ["Digit0", UnitType.AtomBomb],
     ["KeyH", UnitType.HydrogenBomb],
+    ["KeyJ", UnitType.ClusterRocket],
+    ["KeyK", UnitType.TacticalRocket],
+    ["KeyL", UnitType.MissileShip],
   ]);
 
   private pendingQuickBuild: UnitType | null = null;
@@ -640,6 +643,7 @@ export class InputHandler {
     }
     return null;
   }
+
   private triggerQuickBuild(
     unitType: UnitType,
     clientX: number,
@@ -651,6 +655,15 @@ export class InputHandler {
     };
     this.eventBus.emit(new QuickBuildEvent(unitType, clientX, clientY));
   }
+
+  destroy() {
+    if (this.moveInterval !== null) {
+      clearInterval(this.moveInterval);
+    }
+    this.eventBus.off(QuickBuildFailedEvent, this.handleQuickBuildFailure);
+    this.activeKeys.clear();
+    this.pendingQuickBuild = null;
+    this.lastQuickBuildAttempt = null;
     this.pointerPositionKnown = false;
   }
 

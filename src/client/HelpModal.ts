@@ -478,6 +478,11 @@ export class HelpModal extends LitElement {
                 <td>${translateText("help_modal.build_warship_desc")}</td>
               </tr>
               <tr>
+                <td>${translateText("help_modal.build_missile_ship")}</td>
+                <td><div class="icon missile-ship-icon"></div></td>
+                <td>${translateText("help_modal.build_missile_ship_desc")}</td>
+              </tr>
+              <tr>
                 <td>${translateText("help_modal.build_silo")}</td>
                 <td><div class="icon missile-silo-icon"></div></td>
                 <td>${translateText("help_modal.build_silo_desc")}</td>
@@ -491,6 +496,16 @@ export class HelpModal extends LitElement {
                 <td>${translateText("help_modal.build_atom")}</td>
                 <td><div class="icon atom-bomb-icon"></div></td>
                 <td>${translateText("help_modal.build_atom_desc")}</td>
+              </tr>
+              <tr>
+                <td>${translateText("help_modal.build_cluster")}</td>
+                <td><div class="icon cluster-rocket-icon"></div></td>
+                <td>${translateText("help_modal.build_cluster_desc")}</td>
+              </tr>
+              <tr>
+                <td>${translateText("help_modal.build_tactical")}</td>
+                <td><div class="icon tactical-rocket-icon"></div></td>
+                <td>${translateText("help_modal.build_tactical_desc")}</td>
               </tr>
               <tr>
                 <td>${translateText("help_modal.build_hydrogen")}</td>
