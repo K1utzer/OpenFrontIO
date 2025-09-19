@@ -84,6 +84,14 @@ export class HelpModal extends LitElement {
               <tr>
                 <td>
                   <div class="scroll-combo-horizontal">
+                    <span class="key">3-9, 0, H</span>
+                  </div>
+                </td>
+                <td>${translateText("help_modal.action_quick_build")}</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="scroll-combo-horizontal">
                     <span class="key">${getAltKey()}</span>
                     <span class="plus">+</span>
                     <div class="mouse-shell alt-left-click">
