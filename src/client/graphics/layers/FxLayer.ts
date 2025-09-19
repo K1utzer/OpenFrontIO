@@ -228,7 +228,7 @@ export class FxLayer implements Layer {
       if (!unit.reachedTarget()) {
         this.handleSAMInterception(unit);
       } else {
-        this.spawnMiniExplosion(unit.lastTile(), false);
+        this.spawnMiniExplosion(unit.tile(), false);
       }
     }
   }
