@@ -78,6 +78,21 @@ export class ToggleStructureEvent implements GameEvent {
   constructor(public readonly structureType: UnitType | null) {}
 }
 
+export class QuickBuildEvent implements GameEvent {
+  constructor(
+    public readonly unitType: UnitType,
+    public readonly x: number,
+    public readonly y: number,
+  ) {}
+}
+
+export class QuickBuildFailedEvent implements GameEvent {
+  constructor(
+    public readonly x: number,
+    public readonly y: number,
+  ) {}
+}
+
 export class ShowBuildMenuEvent implements GameEvent {
   constructor(
     public readonly x: number,
@@ -132,6 +147,28 @@ export class InputHandler {
   private moveInterval: NodeJS.Timeout | null = null;
   private activeKeys = new Set<string>();
   private keybinds: Record<string, string> = {};
+  private readonly quickBuildHotkeys = new Map<string, UnitType>([
+    ["Digit3", UnitType.Port],
+    ["Digit4", UnitType.City],
+    ["Digit5", UnitType.Factory],
+    ["Digit6", UnitType.DefensePost],
+    ["Digit7", UnitType.SAMLauncher],
+    ["Digit8", UnitType.MissileSilo],
+    ["Digit9", UnitType.Warship],
+    ["Digit0", UnitType.AtomBomb],
+    ["KeyH", UnitType.HydrogenBomb],
+  ]);
+
+  private pendingQuickBuild: UnitType | null = null;
+  private lastQuickBuildAttempt: { x: number; y: number } | null = null;
+  private readonly handleQuickBuildFailure = (event: QuickBuildFailedEvent) => {
+    if (this.lastQuickBuildAttempt === null) {
+      return;
+    }
+
+    this.eventBus.emit(new MouseUpEvent(event.x, event.y));
+    this.lastQuickBuildAttempt = null;
+  };
 
   private readonly PAN_SPEED = 5;
   private readonly ZOOM_SPEED = 10;
@@ -289,7 +326,8 @@ export class InputHandler {
           "ControlRight",
           "ShiftLeft",
           "ShiftRight",
-        ].includes(e.code)
+        ].includes(e.code) ||
+        this.quickBuildHotkeys.has(e.code)
       ) {
         this.activeKeys.add(e.code);
       }
@@ -341,9 +379,13 @@ export class InputHandler {
 
       this.activeKeys.delete(e.code);
     });
+
+    this.eventBus.on(QuickBuildFailedEvent, this.handleQuickBuildFailure);
   }
 
   private onPointerDown(event: PointerEvent) {
+    this.lastQuickBuildAttempt = null;
+
     if (event.button === 1) {
       event.preventDefault();
       this.eventBus.emit(new AutoUpgradeEvent(event.clientX, event.clientY));
@@ -353,6 +395,9 @@ export class InputHandler {
     if (event.button > 0) {
       return;
     }
+
+    this.pendingQuickBuild =
+      event.pointerType === "touch" ? null : this.getActiveQuickBuildUnitType();
 
     this.pointerDown = true;
     this.pointers.set(event.pointerId, event);
@@ -379,6 +424,10 @@ export class InputHandler {
     if (event.button > 0) {
       return;
     }
+
+    const quickBuildCandidate =
+      event.pointerType === "touch" ? null : this.pendingQuickBuild;
+    this.pendingQuickBuild = null;
     this.pointerDown = false;
     this.pointers.clear();
 
@@ -395,6 +444,21 @@ export class InputHandler {
       Math.abs(event.x - this.lastPointerDownX) +
       Math.abs(event.y - this.lastPointerDownY);
     if (dist < 10) {
+      if (event.pointerType !== "touch") {
+        const quickBuildType =
+          quickBuildCandidate ?? this.getActiveQuickBuildUnitType();
+        if (quickBuildType !== null) {
+          this.lastQuickBuildAttempt = {
+            x: event.clientX,
+            y: event.clientY,
+          };
+          this.eventBus.emit(
+            new QuickBuildEvent(quickBuildType, event.clientX, event.clientY),
+          );
+          return;
+        }
+      }
+
       if (event.pointerType === "touch") {
         this.eventBus.emit(new ContextMenuEvent(event.clientX, event.clientY));
         event.preventDefault();
@@ -548,11 +612,23 @@ export class InputHandler {
     };
   }
 
+  private getActiveQuickBuildUnitType(): UnitType | null {
+    for (const [code, unitType] of this.quickBuildHotkeys) {
+      if (this.activeKeys.has(code)) {
+        return unitType;
+      }
+    }
+    return null;
+  }
+
   destroy() {
     if (this.moveInterval !== null) {
       clearInterval(this.moveInterval);
     }
+    this.eventBus.off(QuickBuildFailedEvent, this.handleQuickBuildFailure);
     this.activeKeys.clear();
+    this.pendingQuickBuild = null;
+    this.lastQuickBuildAttempt = null;
   }
 
   isModifierKeyPressed(event: PointerEvent): boolean {
