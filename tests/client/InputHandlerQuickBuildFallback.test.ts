@@ -58,6 +58,7 @@ describe("InputHandler quick build fallback", () => {
 
     eventBus.emit(new QuickBuildFailedEvent(pointerMove.x, pointerMove.y));
 
+
     const mouseUpCall = emitSpy.mock.calls.find(
       ([event]) => event instanceof MouseUpEvent,
     );

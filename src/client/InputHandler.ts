@@ -640,7 +640,6 @@ export class InputHandler {
     }
     return null;
   }
-
   private triggerQuickBuild(
     unitType: UnitType,
     clientX: number,
@@ -652,15 +651,6 @@ export class InputHandler {
     };
     this.eventBus.emit(new QuickBuildEvent(unitType, clientX, clientY));
   }
-
-  destroy() {
-    if (this.moveInterval !== null) {
-      clearInterval(this.moveInterval);
-    }
-    this.eventBus.off(QuickBuildFailedEvent, this.handleQuickBuildFailure);
-    this.activeKeys.clear();
-    this.pendingQuickBuild = null;
-    this.lastQuickBuildAttempt = null;
     this.pointerPositionKnown = false;
   }
 
