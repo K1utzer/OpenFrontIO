@@ -27,11 +27,13 @@ type RocketConfig = {
 const rocketConfig: Record<RocketUnitType, RocketConfig> = {
   [UnitType.ClusterRocket]: {
     speed: 8,
+
     blastRadius: 1,
     troopDamage: 350,
     bursts: { min: 3, max: 5 },
     spread: 26,
     minClusterSpacing: 10,
+
   },
   [UnitType.TacticalRocket]: {
     speed: 12,
@@ -311,6 +313,7 @@ export class RocketExecution implements Execution {
     const maxAttempts = Math.max(20, desiredBlasts * 60);
 
     const addIfValid = (tile: TileRef | null, enforceSpacing = true) => {
+
       if (tile === null) {
         return false;
       }
@@ -428,8 +431,10 @@ export class RocketExecution implements Execution {
     const maxX = baseX + spread;
     const minY = baseY - spread;
     const maxY = baseY + spread;
+
     const maxLocalAttempts = 80;
     const maxDistanceSquared = spread * spread;
+
 
     for (let tries = 0; tries < maxLocalAttempts; tries++) {
       const x = this.random.nextInt(minX, maxX + 1);
@@ -442,12 +447,14 @@ export class RocketExecution implements Execution {
         continue;
       }
       if (
+
         spread > 0 &&
         this.mg.euclideanDistSquared(tile, this.dst) > maxDistanceSquared
       ) {
         continue;
       }
       if (
+
         targetOwner !== null &&
         targetOwner.isPlayer() &&
         (!this.mg.hasOwner(tile) || this.mg.owner(tile) !== targetOwner)
