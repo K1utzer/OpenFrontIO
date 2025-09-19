@@ -5,10 +5,10 @@ import {
   Player,
   PlayerInfo,
   PlayerType,
-  TileRef,
   Unit,
   UnitType,
 } from "../src/core/game/Game";
+import { TileRef } from "./GameMap";
 import { setup } from "./util/Setup";
 import { executeTicks } from "./util/utils";
 
