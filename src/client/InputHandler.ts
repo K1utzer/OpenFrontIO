@@ -158,6 +158,7 @@ export class InputHandler {
     ["Digit9", UnitType.Warship],
     ["Digit0", UnitType.AtomBomb],
     ["KeyH", UnitType.HydrogenBomb],
+    ["KeyM", UnitType.MIRV],
     ["KeyJ", UnitType.ClusterRocket],
     ["KeyK", UnitType.TacticalRocket],
     ["KeyL", UnitType.MissileShip],

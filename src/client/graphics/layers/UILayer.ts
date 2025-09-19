@@ -123,6 +123,7 @@ export class UILayer implements Layer {
       }
       case UnitType.MissileShip: {
         this.drawHealthBar(unit);
+        this.createLoadingBar(unit);
         break;
       }
       case UnitType.MissileSilo:

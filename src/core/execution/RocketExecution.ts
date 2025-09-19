@@ -3,6 +3,7 @@ import {
   Game,
   isStructureType,
   Player,
+  TerraNullius,
   TrajectoryTile,
   Unit,
   UnitType,
@@ -20,15 +21,17 @@ type RocketConfig = {
   troopDamage: number;
   bursts: { min: number; max: number };
   spread: number;
+  minClusterSpacing?: number;
 };
 
 const rocketConfig: Record<RocketUnitType, RocketConfig> = {
   [UnitType.ClusterRocket]: {
     speed: 8,
     blastRadius: 1,
-    troopDamage: 300,
-    bursts: { min: 5, max: 10 },
-    spread: 6,
+    troopDamage: 350,
+    bursts: { min: 3, max: 5 },
+    spread: 26,
+    minClusterSpacing: 10,
   },
   [UnitType.TacticalRocket]: {
     speed: 12,
@@ -174,30 +177,36 @@ export class RocketExecution implements Execution {
       blasts.push(tile);
     };
 
-    addBlast(this.dst);
-
     const totalBlasts = this.randomBurstCount(config);
-    const baseX = this.mg.x(this.dst);
-    const baseY = this.mg.y(this.dst);
+    if (this.rocketType === UnitType.ClusterRocket) {
+      const clusterTargets = this.generateClusterBlasts(config, totalBlasts);
+      for (const target of clusterTargets) {
+        addBlast(target);
+      }
+    } else {
+      addBlast(this.dst);
+      const baseX = this.mg.x(this.dst);
+      const baseY = this.mg.y(this.dst);
 
-    if (config.spread > 0) {
-      let attempts = 0;
-      const maxAttempts = totalBlasts * 8;
-      while (blasts.length < totalBlasts && attempts < maxAttempts) {
-        attempts++;
-        const distance = this.random.nextFloat(0, config.spread);
-        const angle = this.random.nextFloat(0, Math.PI * 2);
-        const offsetX = Math.round(Math.cos(angle) * distance);
-        const offsetY = Math.round(Math.sin(angle) * distance);
-        if (offsetX === 0 && offsetY === 0) {
-          continue;
+      if (config.spread > 0) {
+        let attempts = 0;
+        const maxAttempts = totalBlasts * 8;
+        while (blasts.length < totalBlasts && attempts < maxAttempts) {
+          attempts++;
+          const distance = this.random.nextFloat(0, config.spread);
+          const angle = this.random.nextFloat(0, Math.PI * 2);
+          const offsetX = Math.round(Math.cos(angle) * distance);
+          const offsetY = Math.round(Math.sin(angle) * distance);
+          if (offsetX === 0 && offsetY === 0) {
+            continue;
+          }
+          const x = baseX + offsetX;
+          const y = baseY + offsetY;
+          if (!this.mg.isValidCoord(x, y)) {
+            continue;
+          }
+          addBlast(this.mg.ref(x, y));
         }
-        const x = baseX + offsetX;
-        const y = baseY + offsetY;
-        if (!this.mg.isValidCoord(x, y)) {
-          continue;
-        }
-        addBlast(this.mg.ref(x, y));
       }
     }
 
@@ -278,6 +287,177 @@ export class RocketExecution implements Execution {
       return Math.max(min, 1);
     }
     return this.random.nextInt(min, max + 1);
+  }
+
+  private generateClusterBlasts(
+    config: RocketConfig,
+    desiredBlasts: number,
+  ): TileRef[] {
+    const blasts: TileRef[] = [];
+    const seen = new Set<TileRef>();
+
+    const baseX = this.mg.x(this.dst);
+    const baseY = this.mg.y(this.dst);
+    const preferLand = this.mg.isLand(this.dst);
+    const targetOwner = this.mg.hasOwner(this.dst)
+      ? this.mg.owner(this.dst)
+      : null;
+
+    const minSpacing = Math.max(
+      4,
+      config.minClusterSpacing ?? Math.floor(Math.max(config.spread, 1) / 3),
+    );
+    const minSpacingSquared = minSpacing * minSpacing;
+    const maxAttempts = Math.max(20, desiredBlasts * 60);
+
+    const addIfValid = (tile: TileRef | null, enforceSpacing = true) => {
+      if (tile === null) {
+        return false;
+      }
+      if (seen.has(tile)) {
+        return false;
+      }
+      if (
+        enforceSpacing &&
+        blasts.some(
+          (existing) =>
+            this.mg.euclideanDistSquared(existing, tile) < minSpacingSquared,
+        )
+      ) {
+        return false;
+      }
+      seen.add(tile);
+      blasts.push(tile);
+      return true;
+    };
+
+    addIfValid(this.dst, false);
+
+    if (targetOwner !== null && targetOwner.isPlayer()) {
+      const playerOwner = targetOwner;
+      const maxDistanceSquared =
+        config.spread > 0
+          ? config.spread * config.spread
+          : Number.POSITIVE_INFINITY;
+      const ownerTargets: TileRef[] = [];
+      for (const unit of this.mg.units()) {
+        if (!unit.isActive() || unit.owner() !== playerOwner) {
+          continue;
+        }
+        if (
+          unit.type() === UnitType.ClusterRocket ||
+          unit.type() === UnitType.TacticalRocket ||
+          unit.type() === UnitType.MIRVWarhead ||
+          unit.type() === UnitType.MIRV
+        ) {
+          continue;
+        }
+        if (
+          config.spread > 0 &&
+          this.mg.euclideanDistSquared(unit.tile(), this.dst) >
+            maxDistanceSquared
+        ) {
+          continue;
+        }
+        ownerTargets.push(unit.tile());
+      }
+
+      ownerTargets.sort(
+        (a, b) =>
+          this.mg.euclideanDistSquared(b, this.dst) -
+          this.mg.euclideanDistSquared(a, this.dst),
+      );
+
+      for (const tile of ownerTargets) {
+        if (blasts.length >= desiredBlasts) {
+          break;
+        }
+        addIfValid(tile);
+      }
+    }
+
+    let attempts = 0;
+    while (blasts.length < desiredBlasts && attempts < maxAttempts) {
+      attempts++;
+      const ignoreOwner = attempts > maxAttempts / 2;
+      const candidate = this.randomClusterTarget(
+        baseX,
+        baseY,
+        config.spread,
+        ignoreOwner ? null : targetOwner,
+        preferLand,
+      );
+      addIfValid(candidate);
+    }
+
+    if (blasts.length < desiredBlasts) {
+      let fallbackAttempts = maxAttempts;
+      while (blasts.length < desiredBlasts && fallbackAttempts > 0) {
+        fallbackAttempts--;
+        const ignoreOwner = fallbackAttempts < maxAttempts / 2;
+        const candidate = this.randomClusterTarget(
+          baseX,
+          baseY,
+          config.spread,
+          ignoreOwner ? null : targetOwner,
+          preferLand,
+        );
+        addIfValid(candidate, false);
+      }
+    }
+
+    if (blasts.length === 0) {
+      blasts.push(this.dst);
+    }
+
+    return blasts;
+  }
+
+  private randomClusterTarget(
+    baseX: number,
+    baseY: number,
+    spread: number,
+    targetOwner: Player | TerraNullius | null,
+    preferLand: boolean,
+  ): TileRef | null {
+    if (spread <= 0) {
+      return this.dst;
+    }
+
+    const minX = baseX - spread;
+    const maxX = baseX + spread;
+    const minY = baseY - spread;
+    const maxY = baseY + spread;
+    const maxLocalAttempts = 80;
+    const maxDistanceSquared = spread * spread;
+
+    for (let tries = 0; tries < maxLocalAttempts; tries++) {
+      const x = this.random.nextInt(minX, maxX + 1);
+      const y = this.random.nextInt(minY, maxY + 1);
+      if (!this.mg.isValidCoord(x, y)) {
+        continue;
+      }
+      const tile = this.mg.ref(x, y);
+      if (preferLand && !this.mg.isLand(tile)) {
+        continue;
+      }
+      if (
+        spread > 0 &&
+        this.mg.euclideanDistSquared(tile, this.dst) > maxDistanceSquared
+      ) {
+        continue;
+      }
+      if (
+        targetOwner !== null &&
+        targetOwner.isPlayer() &&
+        (!this.mg.hasOwner(tile) || this.mg.owner(tile) !== targetOwner)
+      ) {
+        continue;
+      }
+      return tile;
+    }
+
+    return null;
   }
 
   private findCarrier(spawn: TileRef): Unit | null {
