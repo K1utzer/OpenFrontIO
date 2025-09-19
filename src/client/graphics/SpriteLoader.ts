@@ -1,14 +1,17 @@
 import { Colord } from "colord";
 import atomBombSprite from "../../../resources/sprites/atombomb.png";
+import clusterSprite from "../../../resources/sprites/cluster.png";
 import hydrogenBombSprite from "../../../resources/sprites/hydrogenbomb.png";
 import mirvSprite from "../../../resources/sprites/mirv2.png";
 import samMissileSprite from "../../../resources/sprites/samMissile.png";
+import tacticalSprite from "../../../resources/sprites/tactical.png";
 import tradeShipSprite from "../../../resources/sprites/tradeship.png";
 import trainCarriageSprite from "../../../resources/sprites/trainCarriage.png";
 import trainLoadedCarriageSprite from "../../../resources/sprites/trainCarriageLoaded.png";
 import trainEngineSprite from "../../../resources/sprites/trainEngine.png";
 import transportShipSprite from "../../../resources/sprites/transportship.png";
 import warshipSprite from "../../../resources/sprites/warship.png";
+import warship2Sprite from "../../../resources/sprites/warship2.png";
 import { Theme } from "../../core/configuration/Config";
 import { TrainType, UnitType } from "../../core/game/Game";
 import { UnitView } from "../../core/game/GameView";
@@ -25,11 +28,11 @@ type TrainTypeSprite = (typeof TrainTypeSprite)[keyof typeof TrainTypeSprite];
 const SPRITE_CONFIG: Partial<Record<UnitType | TrainTypeSprite, string>> = {
   [UnitType.TransportShip]: transportShipSprite,
   [UnitType.Warship]: warshipSprite,
-  [UnitType.MissileShip]: warshipSprite,
+  [UnitType.MissileShip]: warship2Sprite,
   [UnitType.SAMMissile]: samMissileSprite,
   [UnitType.AtomBomb]: atomBombSprite,
-  [UnitType.ClusterRocket]: atomBombSprite,
-  [UnitType.TacticalRocket]: samMissileSprite,
+  [UnitType.ClusterRocket]: clusterSprite,
+  [UnitType.TacticalRocket]: tacticalSprite,
   [UnitType.HydrogenBomb]: hydrogenBombSprite,
   [UnitType.TradeShip]: tradeShipSprite,
   [UnitType.MIRV]: mirvSprite,
