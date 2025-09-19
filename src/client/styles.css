@@ -395,6 +395,11 @@ label.option-card:hover {
     cover;
 }
 
+#helpModal .missile-ship-icon {
+  mask: url("../../resources/images/DestroyerIconWhite.svg") no-repeat center /
+    cover;
+}
+
 #helpModal .missile-silo-icon {
   mask: url("../../resources/images/MissileSiloIconWhite.svg") no-repeat
     center / cover;
@@ -407,6 +412,16 @@ label.option-card:hover {
 
 #helpModal .atom-bomb-icon {
   mask: url("../../resources/images/NukeIconWhite.svg") no-repeat center / cover;
+}
+
+#helpModal .cluster-rocket-icon {
+  mask: url("../../resources/images/ExplosionIconWhite.svg") no-repeat center /
+    cover;
+}
+
+#helpModal .tactical-rocket-icon {
+  mask: url("../../resources/images/TargetIconWhite.svg") no-repeat center /
+    cover;
 }
 
 #helpModal .hydrogen-bomb-icon {

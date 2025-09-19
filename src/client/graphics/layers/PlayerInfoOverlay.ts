@@ -5,6 +5,7 @@ import allianceIcon from "../../../../resources/images/AllianceIcon.svg";
 import portIcon from "../../../../resources/images/AnchorIcon.png";
 import warshipIcon from "../../../../resources/images/BattleshipIconWhite.svg";
 import cityIcon from "../../../../resources/images/CityIconWhite.svg";
+import missileShipIcon from "../../../../resources/images/DestroyerIconWhite.svg";
 import factoryIcon from "../../../../resources/images/FactoryIconWhite.svg";
 import goldCoinIcon from "../../../../resources/images/GoldCoinIcon.svg";
 import missileSiloIcon from "../../../../resources/images/MissileSiloUnit.png";
@@ -127,7 +128,12 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
       this.setVisible(true);
     } else if (!this.game.isLand(tile)) {
       const units = this.game
-        .units(UnitType.Warship, UnitType.TradeShip, UnitType.TransportShip)
+        .units(
+          UnitType.Warship,
+          UnitType.MissileShip,
+          UnitType.TradeShip,
+          UnitType.TransportShip,
+        )
         .filter((u) => euclideanDistWorld(worldCoord, u.tile(), this.game) < 50)
         .sort(distSortUnitWorld(worldCoord, this.game));
 
@@ -393,6 +399,12 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
                   UnitType.Warship,
                   warshipIcon,
                   "player_info_overlay.warships",
+                )}
+                ${this.displayUnitCount(
+                  player,
+                  UnitType.MissileShip,
+                  missileShipIcon,
+                  "player_info_overlay.missile_ships",
                 )}
               </div>
             `

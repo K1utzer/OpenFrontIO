@@ -44,10 +44,31 @@ jest.mock("../../../src/client/graphics/layers/BuildMenu", () => {
         countable: false,
       },
       {
+        unitType: UnitType.ClusterRocket,
+        key: "unit_type.cluster_rocket",
+        description: "unit_type.cluster_rocket_desc",
+        icon: "cluster-rocket-icon",
+        countable: false,
+      },
+      {
+        unitType: UnitType.TacticalRocket,
+        key: "unit_type.tactical_rocket",
+        description: "unit_type.tactical_rocket_desc",
+        icon: "tactical-rocket-icon",
+        countable: false,
+      },
+      {
         unitType: UnitType.Warship,
         key: "unit_type.warship",
         description: "unit_type.warship_desc",
         icon: "warship-icon",
+        countable: true,
+      },
+      {
+        unitType: UnitType.MissileShip,
+        key: "unit_type.missile_ship",
+        description: "unit_type.missile_ship_desc",
+        icon: "missile-ship-icon",
         countable: true,
       },
       {
@@ -120,7 +141,10 @@ describe("RadialMenuElements", () => {
         { type: UnitType.City, canBuild: true },
         { type: UnitType.Factory, canBuild: true },
         { type: UnitType.AtomBomb, canBuild: true },
+        { type: UnitType.ClusterRocket, canBuild: true },
+        { type: UnitType.TacticalRocket, canBuild: true },
         { type: UnitType.Warship, canBuild: true },
+        { type: UnitType.MissileShip, canBuild: true },
         { type: UnitType.HydrogenBomb, canBuild: true },
         { type: UnitType.MIRV, canBuild: true },
         { type: UnitType.TransportShip, canBuild: true },
@@ -184,9 +208,12 @@ describe("RadialMenuElements", () => {
 
       const attackUnitTypes = [
         UnitType.AtomBomb,
+        UnitType.ClusterRocket,
+        UnitType.TacticalRocket,
         UnitType.MIRV,
         UnitType.HydrogenBomb,
         UnitType.Warship,
+        UnitType.MissileShip,
       ];
       const returnedUnitTypes = subMenu.map((item) => {
         const unitTypeStr = item.id.replace("attack_", "");
