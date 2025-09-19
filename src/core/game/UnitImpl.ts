@@ -39,6 +39,7 @@ export class UnitImpl implements Unit {
   // Nuke only
   private _trajectoryIndex: number = 0;
   private _trajectory: TrajectoryTile[];
+  private _payloadTiles: TileRef[] | undefined;
 
   constructor(
     private _type: UnitType,
@@ -133,6 +134,7 @@ export class UnitImpl implements Unit {
       constructionType: this._constructionType,
       targetUnitId: this._targetUnit?.id() ?? undefined,
       targetTile: this.targetTile() ?? undefined,
+      payloadTiles: this._payloadTiles,
       missileTimerQueue: this._missileTimerQueue,
       level: this.level(),
       hasTrainStation: this._hasTrainStation,
@@ -342,6 +344,15 @@ export class UnitImpl implements Unit {
 
   trajectory(): TrajectoryTile[] {
     return this._trajectory;
+  }
+
+  payloadTiles(): TileRef[] | undefined {
+    return this._payloadTiles;
+  }
+
+  setPayloadTiles(tiles: TileRef[] | undefined): void {
+    this._payloadTiles = tiles;
+    this.mg.addUpdate(this.toUpdate());
   }
 
   setTargetUnit(target: Unit | undefined): void {

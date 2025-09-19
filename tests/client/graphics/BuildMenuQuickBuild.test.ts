@@ -158,6 +158,7 @@ describe("BuildMenu quick build", () => {
     expect(failureEvent.x).toBe(10);
     expect(failureEvent.y).toBe(20);
   });
+
   it("includes missile ship and rockets in the build table", () => {
     const unitTypes = flattenedBuildTable.map((entry) => entry.unitType);
     expect(unitTypes).toContain(UnitType.MissileShip);

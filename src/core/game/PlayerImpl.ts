@@ -1181,7 +1181,7 @@ export class PlayerImpl implements Player {
 
   missileStrikeSpawn(targetTile: TileRef): TileRef | false {
     const carriers = this.units(UnitType.MissileShip)
-      .filter((ship) => ship.isActive())
+      .filter((ship) => ship.isActive() && !ship.isInCooldown())
       .sort(
         (a, b) =>
           this.mg.manhattanDist(a.tile(), targetTile) -

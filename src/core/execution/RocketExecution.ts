@@ -18,23 +18,23 @@ type RocketConfig = {
   speed: number;
   blastRadius: number;
   troopDamage: number;
-  burstCount: number;
+  bursts: { min: number; max: number };
   spread: number;
 };
 
 const rocketConfig: Record<RocketUnitType, RocketConfig> = {
   [UnitType.ClusterRocket]: {
     speed: 8,
-    blastRadius: 2,
+    blastRadius: 1,
     troopDamage: 300,
-    burstCount: 5,
-    spread: 3,
+    bursts: { min: 5, max: 10 },
+    spread: 6,
   },
   [UnitType.TacticalRocket]: {
     speed: 12,
     blastRadius: 1,
     troopDamage: 450,
-    burstCount: 1,
+    bursts: { min: 1, max: 1 },
     spread: 0,
   },
 };
@@ -43,6 +43,7 @@ export class RocketExecution implements Execution {
   private active = true;
   private mg: Game;
   private rocket: Unit | null = null;
+  private carrier: Unit | null = null;
   private pathFinder: ParabolaPathFinder;
   private random: PseudoRandom;
 
@@ -68,12 +69,25 @@ export class RocketExecution implements Execution {
         return;
       }
       this.src = spawn;
+      this.carrier ??= this.findCarrier(spawn);
+      if (this.carrier === null) {
+        console.warn(`no missile ship available for ${this.rocketType}`);
+        this.active = false;
+        return;
+      }
+      if (this.carrier.isInCooldown()) {
+        console.warn(`missile ship on cooldown for ${this.rocketType}`);
+        this.active = false;
+        return;
+      }
       const config = rocketConfig[this.rocketType];
       this.pathFinder.computeControlPoints(spawn, this.dst, config.speed, true);
       this.rocket = this.player.buildUnit(this.rocketType, spawn, {
         targetTile: this.dst,
         trajectory: this.getTrajectory(this.dst),
       });
+
+      this.carrier.launch();
 
       if (this.mg.hasOwner(this.dst)) {
         const target = this.mg.owner(this.dst);
@@ -150,25 +164,55 @@ export class RocketExecution implements Execution {
     }
 
     const config = rocketConfig[this.rocketType];
-    const blasts = new Set<TileRef>();
-    blasts.add(this.dst);
-
-    for (let i = 1; i < config.burstCount; i++) {
-      const offsetX = this.random.nextInt(-config.spread, config.spread);
-      const offsetY = this.random.nextInt(-config.spread, config.spread);
-      const x = this.mg.x(this.dst) + offsetX;
-      const y = this.mg.y(this.dst) + offsetY;
-      if (!this.mg.isValidCoord(x, y)) {
-        continue;
+    const blasts: TileRef[] = [];
+    const seen = new Set<TileRef>();
+    const addBlast = (tile: TileRef) => {
+      if (seen.has(tile)) {
+        return;
       }
-      blasts.add(this.mg.ref(x, y));
+      seen.add(tile);
+      blasts.push(tile);
+    };
+
+    addBlast(this.dst);
+
+    const totalBlasts = this.randomBurstCount(config);
+    const baseX = this.mg.x(this.dst);
+    const baseY = this.mg.y(this.dst);
+
+    if (config.spread > 0) {
+      let attempts = 0;
+      const maxAttempts = totalBlasts * 8;
+      while (blasts.length < totalBlasts && attempts < maxAttempts) {
+        attempts++;
+        const distance = this.random.nextFloat(0, config.spread);
+        const angle = this.random.nextFloat(0, Math.PI * 2);
+        const offsetX = Math.round(Math.cos(angle) * distance);
+        const offsetY = Math.round(Math.sin(angle) * distance);
+        if (offsetX === 0 && offsetY === 0) {
+          continue;
+        }
+        const x = baseX + offsetX;
+        const y = baseY + offsetY;
+        if (!this.mg.isValidCoord(x, y)) {
+          continue;
+        }
+        addBlast(this.mg.ref(x, y));
+      }
     }
+
+    if (this.rocket.tile() !== this.dst) {
+      this.rocket.move(this.dst);
+    }
+    this.rocket.setPayloadTiles(blasts);
 
     for (const blast of blasts) {
       this.applyBlast(blast, config.blastRadius, config.troopDamage);
     }
 
-    this.redrawBuildings(config.blastRadius + 4);
+
+    this.redrawBuildings(config.blastRadius + 4, blasts);
+
 
     this.active = false;
     this.rocket.setReachedTarget();
@@ -215,17 +259,39 @@ export class RocketExecution implements Execution {
     }
   }
 
-  private redrawBuildings(range: number) {
+  private redrawBuildings(range: number, centers: TileRef[]) {
     const rangeSquared = range * range;
     for (const unit of this.mg.units()) {
-      if (isStructureType(unit.type())) {
-        if (
-          this.mg.euclideanDistSquared(this.dst, unit.tile()) < rangeSquared
-        ) {
+      if (!isStructureType(unit.type())) {
+        continue;
+      }
+      for (const center of centers) {
+        if (this.mg.euclideanDistSquared(center, unit.tile()) < rangeSquared) {
           unit.touch();
+          break;
         }
       }
     }
+  }
+
+  private randomBurstCount(config: RocketConfig): number {
+    const { min, max } = config.bursts;
+    if (min >= max) {
+      return Math.max(min, 1);
+    }
+    return this.random.nextInt(min, max + 1);
+  }
+
+  private findCarrier(spawn: TileRef): Unit | null {
+    const carriers = this.player
+      .units(UnitType.MissileShip)
+      .filter(
+        (ship) =>
+          ship.isActive() &&
+          ship.tile() === spawn &&
+          ship.owner() === this.player,
+      );
+    return carriers[0] ?? null;
   }
 
   owner(): Player {

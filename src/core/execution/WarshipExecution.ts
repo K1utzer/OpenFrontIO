@@ -71,6 +71,7 @@ export class WarshipExecution implements Execution {
       this.warship.delete();
       return;
     }
+    this.handleMissileCooldown();
     const hasPort = this.warship.owner().unitCount(UnitType.Port) > 0;
     if (hasPort) {
       this.warship.modifyHealth(1);
@@ -91,6 +92,20 @@ export class WarshipExecution implements Execution {
         this.warship.setTargetUnit(undefined);
       }
       return;
+    }
+  }
+
+  private handleMissileCooldown() {
+    if (this.warship.type() !== UnitType.MissileShip) {
+      return;
+    }
+    const frontTime = this.warship.missileTimerQueue()[0];
+    if (frontTime === undefined) {
+      return;
+    }
+    const elapsed = this.mg.ticks() - frontTime;
+    if (elapsed >= this.mg.config().missileShipCooldown()) {
+      this.warship.reloadMissile();
     }
   }
 

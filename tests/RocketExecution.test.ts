@@ -5,9 +5,11 @@ import {
   Player,
   PlayerInfo,
   PlayerType,
-  TileRef,
+  Unit,
+
   UnitType,
 } from "../src/core/game/Game";
+import { TileRef } from "../src/core/game/GameMap";
 import { setup } from "./util/Setup";
 import { executeTicks } from "./util/utils";
 
@@ -71,6 +73,8 @@ function claimLandFor(
 function prepareMissileShip(): {
   missileShipTile: TileRef;
   patrol: TileRef;
+  missileShip: Unit;
+
 } {
   const portTile = player1PortTile;
   player1.buildUnit(UnitType.Port, portTile, {});
@@ -90,7 +94,13 @@ function prepareMissileShip(): {
       allowShells: false,
     }),
   );
-  return { missileShipTile: missileShip.tile(), patrol: patrolTile };
+
+  return {
+    missileShipTile: missileShip.tile(),
+    patrol: patrolTile,
+    missileShip,
+  };
+
 }
 
 describe("RocketExecution", () => {
@@ -115,12 +125,9 @@ describe("RocketExecution", () => {
     const city = player2.buildUnit(UnitType.City, player2LandTile, {});
 
     game.addExecution(
-      new RocketExecution(
-        UnitType.ClusterRocket,
-        player1,
-        player2LandTile,
-        missileShipTile,
-      ),
+
+      new RocketExecution(UnitType.ClusterRocket, player1, player2LandTile),
+
     );
 
     executeTicks(game, 200);
@@ -133,17 +140,40 @@ describe("RocketExecution", () => {
     const { missileShipTile } = prepareMissileShip();
 
     game.addExecution(
-      new RocketExecution(
-        UnitType.TacticalRocket,
-        player1,
-        player2LandTile,
-        missileShipTile,
-      ),
+
+      new RocketExecution(UnitType.TacticalRocket, player1, player2LandTile),
+
     );
 
     const ownerBefore = game.owner(player2LandTile);
     executeTicks(game, 200);
 
     expect(game.owner(player2LandTile)).toBe(ownerBefore);
+  });
+
+  test("missile ship enters cooldown after firing", () => {
+    const { missileShipTile } = prepareMissileShip();
+    const readyShip = player1.units(UnitType.MissileShip)[0];
+    expect(readyShip.isInCooldown()).toBe(false);
+
+    game.addExecution(
+      new RocketExecution(UnitType.ClusterRocket, player1, player2LandTile),
+    );
+
+    executeTicks(game, 2);
+
+    const activeShip = player1.units(UnitType.MissileShip)[0];
+    expect(activeShip.missileTimerQueue().length).toBeGreaterThan(0);
+    expect(player1.canBuild(UnitType.ClusterRocket, player2LandTile)).toBe(
+      false,
+    );
+
+    const cooldown = game.config().missileShipCooldown();
+    executeTicks(game, cooldown);
+
+    const cooledShip = player1.units(UnitType.MissileShip)[0];
+    expect(cooledShip.missileTimerQueue().length).toBe(0);
+    const spawn = player1.canBuild(UnitType.ClusterRocket, player2LandTile);
+    expect(spawn).toBe(cooledShip.tile());
   });
 });

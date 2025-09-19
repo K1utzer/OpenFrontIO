@@ -296,6 +296,10 @@ export class DefaultConfig implements Config {
     return 75;
   }
 
+  missileShipCooldown(): number {
+    return this.SiloCooldown();
+  }
+
   defensePostRange(): number {
     return 30;
   }

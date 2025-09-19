@@ -125,6 +125,7 @@ export interface UnitUpdate {
   targetable: boolean;
   targetUnitId?: number; // Only for trade ships
   targetTile?: TileRef; // Only for nukes
+  payloadTiles?: TileRef[]; // Only for rockets with payload scatter
   health?: number;
   constructionType?: UnitType;
   missileTimerQueue: number[];

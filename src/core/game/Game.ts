@@ -452,6 +452,8 @@ export interface Unit {
   setTrajectoryIndex(i: number): void;
   trajectoryIndex(): number;
   trajectory(): TrajectoryTile[];
+  payloadTiles(): TileRef[] | undefined;
+  setPayloadTiles(tiles: TileRef[] | undefined): void;
   setTargetUnit(unit: Unit | undefined): void;
   targetUnit(): Unit | undefined;
   setTargetedBySAM(targeted: boolean): void;
