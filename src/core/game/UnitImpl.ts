@@ -39,6 +39,7 @@ export class UnitImpl implements Unit {
   // Nuke only
   private _trajectoryIndex: number = 0;
   private _trajectory: TrajectoryTile[];
+  private _payloadTiles: TileRef[] | undefined;
 
   constructor(
     private _type: UnitType,
@@ -68,6 +69,7 @@ export class UnitImpl implements Unit {
 
     switch (this._type) {
       case UnitType.Warship:
+      case UnitType.MissileShip:
       case UnitType.Port:
       case UnitType.MissileSilo:
       case UnitType.DefensePost:
@@ -132,6 +134,7 @@ export class UnitImpl implements Unit {
       constructionType: this._constructionType,
       targetUnitId: this._targetUnit?.id() ?? undefined,
       targetTile: this.targetTile() ?? undefined,
+      payloadTiles: this._payloadTiles,
       missileTimerQueue: this._missileTimerQueue,
       level: this.level(),
       hasTrainStation: this._hasTrainStation,
@@ -184,6 +187,7 @@ export class UnitImpl implements Unit {
   setOwner(newOwner: PlayerImpl): void {
     switch (this._type) {
       case UnitType.Warship:
+      case UnitType.MissileShip:
       case UnitType.Port:
       case UnitType.MissileSilo:
       case UnitType.DefensePost:
@@ -252,6 +256,7 @@ export class UnitImpl implements Unit {
         case UnitType.Port:
         case UnitType.SAMLauncher:
         case UnitType.Warship:
+        case UnitType.MissileShip:
         case UnitType.Factory:
           this.mg.stats().unitDestroy(destroyer, this._type);
           this.mg.stats().unitLose(this.owner(), this._type);
@@ -339,6 +344,15 @@ export class UnitImpl implements Unit {
 
   trajectory(): TrajectoryTile[] {
     return this._trajectory;
+  }
+
+  payloadTiles(): TileRef[] | undefined {
+    return this._payloadTiles;
+  }
+
+  setPayloadTiles(tiles: TileRef[] | undefined): void {
+    this._payloadTiles = tiles;
+    this.mg.addUpdate(this.toUpdate());
   }
 
   setTargetUnit(target: Unit | undefined): void {

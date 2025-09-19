@@ -2,6 +2,8 @@ import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import warshipIcon from "../../../../resources/images/BattleshipIconWhite.svg";
 import cityIcon from "../../../../resources/images/CityIconWhite.svg";
+import destroyerIcon from "../../../../resources/images/DestroyerIconWhite.svg";
+import explosionIcon from "../../../../resources/images/ExplosionIconWhite.svg";
 import factoryIcon from "../../../../resources/images/FactoryIconWhite.svg";
 import goldCoinIcon from "../../../../resources/images/GoldCoinIcon.svg";
 import mirvIcon from "../../../../resources/images/MIRVIcon.svg";
@@ -11,6 +13,7 @@ import atomBombIcon from "../../../../resources/images/NukeIconWhite.svg";
 import portIcon from "../../../../resources/images/PortIcon.svg";
 import samlauncherIcon from "../../../../resources/images/SamLauncherIconWhite.svg";
 import shieldIcon from "../../../../resources/images/ShieldIconWhite.svg";
+import targetIcon from "../../../../resources/images/TargetIconWhite.svg";
 import { translateText } from "../../../client/Utils";
 import { EventBus } from "../../../core/EventBus";
 import {
@@ -24,6 +27,8 @@ import { GameView } from "../../../core/game/GameView";
 import {
   CloseViewEvent,
   MouseDownEvent,
+  QuickBuildEvent,
+  QuickBuildFailedEvent,
   ShowBuildMenuEvent,
   ShowEmojiMenuEvent,
 } from "../../InputHandler";
@@ -53,6 +58,20 @@ export const buildTable: BuildItemDisplay[][] = [
       countable: false,
     },
     {
+      unitType: UnitType.ClusterRocket,
+      icon: explosionIcon,
+      description: "build_menu.desc.cluster_rocket",
+      key: "unit_type.cluster_rocket",
+      countable: false,
+    },
+    {
+      unitType: UnitType.TacticalRocket,
+      icon: targetIcon,
+      description: "build_menu.desc.tactical_rocket",
+      key: "unit_type.tactical_rocket",
+      countable: false,
+    },
+    {
       unitType: UnitType.MIRV,
       icon: mirvIcon,
       description: "build_menu.desc.mirv",
@@ -71,6 +90,13 @@ export const buildTable: BuildItemDisplay[][] = [
       icon: warshipIcon,
       description: "build_menu.desc.warship",
       key: "unit_type.warship",
+      countable: true,
+    },
+    {
+      unitType: UnitType.MissileShip,
+      icon: destroyerIcon,
+      description: "build_menu.desc.missile_ship",
+      key: "unit_type.missile_ship",
       countable: true,
     },
     {
@@ -152,6 +178,9 @@ export class BuildMenu extends LitElement implements Layer {
       }
       const tile = this.game.ref(clickedCell.x, clickedCell.y);
       this.showMenu(tile);
+    });
+    this.eventBus.on(QuickBuildEvent, (e) => {
+      void this.handleQuickBuild(e);
     });
     this.eventBus.on(CloseViewEvent, () => this.hideMenu());
     this.eventBus.on(ShowEmojiMenuEvent, () => this.hideMenu());
@@ -478,6 +507,63 @@ export class BuildMenu extends LitElement implements Layer {
     this.clickedTile = clickedTile;
     this._hidden = false;
     this.refresh();
+  }
+
+  private async handleQuickBuild(event: QuickBuildEvent) {
+    if (!this.game?.myPlayer()?.isAlive()) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    if (this.game?.config()?.isUnitDisabled(event.unitType)) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    const clickedCell = this.transformHandler.screenToWorldCoordinates(
+      event.x,
+      event.y,
+    );
+    if (clickedCell === null) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+    if (!this.game.isValidCoord(clickedCell.x, clickedCell.y)) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    const tile = this.game.ref(clickedCell.x, clickedCell.y);
+    const player = this.game.myPlayer();
+    if (!player) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    try {
+      const actions = await player.actions(tile);
+      const buildableUnit = actions.buildableUnits.find(
+        (unit) => unit.type === event.unitType,
+      );
+
+      if (
+        !buildableUnit ||
+        (buildableUnit.canBuild === false && buildableUnit.canUpgrade === false)
+      ) {
+        this.emitQuickBuildFailure(event);
+        return;
+      }
+
+      this.playerActions = actions;
+      this.sendBuildOrUpgrade(buildableUnit, tile);
+    } catch (error) {
+      console.error("Failed to handle quick build", error);
+      this.emitQuickBuildFailure(event);
+    }
+  }
+
+  private emitQuickBuildFailure(event: QuickBuildEvent) {
+    this.eventBus.emit(new QuickBuildFailedEvent(event.x, event.y));
   }
 
   private refresh() {

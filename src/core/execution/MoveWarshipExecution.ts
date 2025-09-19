@@ -13,9 +13,11 @@ export class MoveWarshipExecution implements Execution {
       console.warn(`MoveWarshipExecution: position ${this.position} not valid`);
       return;
     }
-    const warship = this.owner
-      .units(UnitType.Warship)
-      .find((u) => u.id() === this.unitId);
+    const warship =
+      this.owner.units(UnitType.Warship).find((u) => u.id() === this.unitId) ??
+      this.owner
+        .units(UnitType.MissileShip)
+        .find((u) => u.id() === this.unitId);
     if (!warship) {
       console.warn("MoveWarshipExecution: warship not found");
       return;

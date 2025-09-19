@@ -296,6 +296,10 @@ export class DefaultConfig implements Config {
     return 75;
   }
 
+  missileShipCooldown(): number {
+    return this.SiloCooldown();
+  }
+
   defensePostRange(): number {
     return 30;
   }
@@ -426,6 +430,15 @@ export class DefaultConfig implements Config {
           territoryBound: false,
           maxHealth: 1000,
         };
+      case UnitType.MissileShip:
+        return {
+          cost: this.costWrapper(
+            (numUnits: number) => Math.min(2_000_000, (numUnits + 1) * 500_000),
+            UnitType.MissileShip,
+          ),
+          territoryBound: false,
+          maxHealth: 900,
+        };
       case UnitType.Shell:
         return {
           cost: () => 0n,
@@ -453,6 +466,16 @@ export class DefaultConfig implements Config {
       case UnitType.AtomBomb:
         return {
           cost: this.costWrapper(() => 750_000, UnitType.AtomBomb),
+          territoryBound: false,
+        };
+      case UnitType.ClusterRocket:
+        return {
+          cost: this.costWrapper(() => 1_200_000, UnitType.ClusterRocket),
+          territoryBound: false,
+        };
+      case UnitType.TacticalRocket:
+        return {
+          cost: this.costWrapper(() => 650_000, UnitType.TacticalRocket),
           territoryBound: false,
         };
       case UnitType.HydrogenBomb:
@@ -868,6 +891,10 @@ export class DefaultConfig implements Config {
         return { inner: 12, outer: 18 };
       case UnitType.AtomBomb:
         return { inner: 12, outer: 30 };
+      case UnitType.ClusterRocket:
+        return { inner: 8, outer: 16 };
+      case UnitType.TacticalRocket:
+        return { inner: 6, outer: 12 };
       case UnitType.HydrogenBomb:
         return { inner: 80, outer: 100 };
     }

@@ -1,5 +1,6 @@
 import { Theme } from "../../../core/configuration/Config";
 import { UnitType } from "../../../core/game/Game";
+import { TileRef } from "../../../core/game/GameMap";
 import {
   BonusEventUpdate,
   ConquestUpdate,
@@ -103,7 +104,14 @@ export class FxLayer implements Layer {
       case UnitType.HydrogenBomb:
         this.onNukeEvent(unit, 160);
         break;
+      case UnitType.ClusterRocket:
+        this.onClusterRocketEvent(unit);
+        break;
+      case UnitType.TacticalRocket:
+        this.onTacticalRocketEvent(unit);
+        break;
       case UnitType.Warship:
+      case UnitType.MissileShip:
         this.onWarshipEvent(unit);
         break;
       case UnitType.Shell:
@@ -205,6 +213,26 @@ export class FxLayer implements Layer {
     }
   }
 
+  onClusterRocketEvent(unit: UnitView) {
+    if (!unit.isActive()) {
+      if (!unit.reachedTarget()) {
+        this.handleSAMInterception(unit);
+      } else {
+        this.handleClusterExplosion(unit);
+      }
+    }
+  }
+
+  onTacticalRocketEvent(unit: UnitView) {
+    if (!unit.isActive()) {
+      if (!unit.reachedTarget()) {
+        this.handleSAMInterception(unit);
+      } else {
+        this.spawnMiniExplosion(unit.lastTile(), false);
+      }
+    }
+  }
+
   onNukeEvent(unit: UnitView, radius: number) {
     if (!unit.isActive()) {
       if (!unit.reachedTarget()) {
@@ -227,6 +255,35 @@ export class FxLayer implements Layer {
       this.game,
     );
     this.allFx = this.allFx.concat(nukeFx);
+  }
+
+  private handleClusterExplosion(unit: UnitView) {
+    const payloadTiles = unit.payloadTiles();
+    const tiles =
+      payloadTiles !== undefined && payloadTiles.length > 0
+        ? payloadTiles
+        : [unit.lastTile()];
+    const seen = new Set<TileRef>();
+    for (const tile of tiles) {
+      if (seen.has(tile)) {
+        continue;
+      }
+      seen.add(tile);
+      this.spawnMiniExplosion(tile, true);
+    }
+  }
+
+  private spawnMiniExplosion(tile: TileRef, includeSmoke: boolean) {
+    const x = this.game.x(tile);
+    const y = this.game.y(tile);
+    this.allFx.push(
+      new SpriteFx(this.animatedSpriteLoader, x, y, FxType.MiniExplosion),
+    );
+    if (includeSmoke) {
+      this.allFx.push(
+        new SpriteFx(this.animatedSpriteLoader, x, y, FxType.MiniSmokeAndFire),
+      );
+    }
   }
 
   handleSAMInterception(unit: UnitView) {

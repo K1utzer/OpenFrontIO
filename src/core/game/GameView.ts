@@ -130,6 +130,10 @@ export class UnitView {
     return this.data.targetTile;
   }
 
+  payloadTiles(): TileRef[] | undefined {
+    return this.data.payloadTiles;
+  }
+
   // How "ready" this unit is from 0 to 1.
   missileReadinesss(): number {
     const maxMissiles = this.data.level;
@@ -149,10 +153,18 @@ export class UnitView {
 
     let readiness = missilesReady / maxMissiles;
 
-    const cooldownDuration =
-      this.data.unitType === UnitType.SAMLauncher
-        ? this.gameView.config().SAMCooldown()
-        : this.gameView.config().SiloCooldown();
+    let cooldownDuration: number;
+    switch (this.data.unitType) {
+      case UnitType.SAMLauncher:
+        cooldownDuration = this.gameView.config().SAMCooldown();
+        break;
+      case UnitType.MissileShip:
+        cooldownDuration = this.gameView.config().missileShipCooldown();
+        break;
+      default:
+        cooldownDuration = this.gameView.config().SiloCooldown();
+        break;
+    }
 
     for (const cooldown of this.data.missileTimerQueue) {
       const cooldownProgress = this.gameView.ticks() - cooldown;

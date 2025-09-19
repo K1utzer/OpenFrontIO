@@ -13,6 +13,11 @@ import { PathFinder } from "../pathfinding/PathFinding";
 import { PseudoRandom } from "../PseudoRandom";
 import { ShellExecution } from "./ShellExecution";
 
+interface WarshipExecutionOptions {
+  unitType: UnitType.Warship | UnitType.MissileShip;
+  allowShells: boolean;
+}
+
 export class WarshipExecution implements Execution {
   private random: PseudoRandom;
   private warship: Unit;
@@ -20,10 +25,18 @@ export class WarshipExecution implements Execution {
   private pathfinder: PathFinder;
   private lastShellAttack = 0;
   private alreadySentShell = new Set<Unit>();
+  private config: WarshipExecutionOptions;
 
   constructor(
     private input: (UnitParams<UnitType.Warship> & OwnerComp) | Unit,
-  ) {}
+    options?: Partial<WarshipExecutionOptions>,
+  ) {
+    this.config = {
+      unitType: UnitType.Warship,
+      allowShells: true,
+      ...options,
+    };
+  }
 
   init(mg: Game, ticks: number): void {
     this.mg = mg;
@@ -31,9 +44,12 @@ export class WarshipExecution implements Execution {
     this.random = new PseudoRandom(mg.ticks());
     if (isUnit(this.input)) {
       this.warship = this.input;
+      this.config.unitType = this.warship.type() as
+        | UnitType.Warship
+        | UnitType.MissileShip;
     } else {
       const spawn = this.input.owner.canBuild(
-        UnitType.Warship,
+        this.config.unitType,
         this.input.patrolTile,
       );
       if (spawn === false) {
@@ -43,7 +59,7 @@ export class WarshipExecution implements Execution {
         return;
       }
       this.warship = this.input.owner.buildUnit(
-        UnitType.Warship,
+        this.config.unitType,
         spawn,
         this.input,
       );
@@ -55,6 +71,7 @@ export class WarshipExecution implements Execution {
       this.warship.delete();
       return;
     }
+    this.handleMissileCooldown();
     const hasPort = this.warship.owner().unitCount(UnitType.Port) > 0;
     if (hasPort) {
       this.warship.modifyHealth(1);
@@ -69,8 +86,26 @@ export class WarshipExecution implements Execution {
     this.patrol();
 
     if (this.warship.targetUnit() !== undefined) {
-      this.shootTarget();
+      if (this.config.allowShells) {
+        this.shootTarget();
+      } else {
+        this.warship.setTargetUnit(undefined);
+      }
       return;
+    }
+  }
+
+  private handleMissileCooldown() {
+    if (this.warship.type() !== UnitType.MissileShip) {
+      return;
+    }
+    const frontTime = this.warship.missileTimerQueue()[0];
+    if (frontTime === undefined) {
+      return;
+    }
+    const elapsed = this.mg.ticks() - frontTime;
+    if (elapsed >= this.mg.config().missileShipCooldown()) {
+      this.warship.reloadMissile();
     }
   }
 
@@ -81,7 +116,12 @@ export class WarshipExecution implements Execution {
     const ships = this.mg.nearbyUnits(
       this.warship.tile()!,
       this.mg.config().warshipTargettingRange(),
-      [UnitType.TransportShip, UnitType.Warship, UnitType.TradeShip],
+      [
+        UnitType.TransportShip,
+        UnitType.Warship,
+        UnitType.MissileShip,
+        UnitType.TradeShip,
+      ],
     );
     const potentialTargets: { unit: Unit; distSquared: number }[] = [];
     for (const { unit, distSquared } of ships) {
@@ -91,6 +131,9 @@ export class WarshipExecution implements Execution {
         unit.owner().isFriendly(this.warship.owner()) ||
         this.alreadySentShell.has(unit)
       ) {
+        continue;
+      }
+      if (!this.config.allowShells && unit.type() !== UnitType.TradeShip) {
         continue;
       }
       if (unit.type() === UnitType.TradeShip) {
@@ -132,7 +175,16 @@ export class WarshipExecution implements Execution {
       )
         return 1;
 
-      // Then prioritize Warships.
+      // Then prioritize combat ships.
+      const unitAWarship =
+        unitA.type() === UnitType.Warship ||
+        unitA.type() === UnitType.MissileShip;
+      const unitBWarship =
+        unitB.type() === UnitType.Warship ||
+        unitB.type() === UnitType.MissileShip;
+      if (unitAWarship && !unitBWarship) return -1;
+      if (!unitAWarship && unitBWarship) return 1;
+
       if (
         unitA.type() === UnitType.Warship &&
         unitB.type() !== UnitType.Warship
@@ -150,6 +202,10 @@ export class WarshipExecution implements Execution {
   }
 
   private shootTarget() {
+    if (!this.config.allowShells) {
+      this.warship.setTargetUnit(undefined);
+      return;
+    }
     const shellAttackRate = this.mg.config().warshipShellAttackRate();
     if (this.mg.ticks() - this.lastShellAttack > shellAttackRate) {
       if (this.warship.targetUnit()?.type() !== UnitType.TransportShip) {

@@ -78,6 +78,21 @@ export class ToggleStructureEvent implements GameEvent {
   constructor(public readonly structureType: UnitType | null) {}
 }
 
+export class QuickBuildEvent implements GameEvent {
+  constructor(
+    public readonly unitType: UnitType,
+    public readonly x: number,
+    public readonly y: number,
+  ) {}
+}
+
+export class QuickBuildFailedEvent implements GameEvent {
+  constructor(
+    public readonly x: number,
+    public readonly y: number,
+  ) {}
+}
+
 export class ShowBuildMenuEvent implements GameEvent {
   constructor(
     public readonly x: number,
@@ -117,6 +132,7 @@ export class AutoUpgradeEvent implements GameEvent {
 export class InputHandler {
   private lastPointerX: number = 0;
   private lastPointerY: number = 0;
+  private pointerPositionKnown = false;
 
   private lastPointerDownX: number = 0;
   private lastPointerDownY: number = 0;
@@ -132,6 +148,31 @@ export class InputHandler {
   private moveInterval: NodeJS.Timeout | null = null;
   private activeKeys = new Set<string>();
   private keybinds: Record<string, string> = {};
+  private readonly quickBuildHotkeys = new Map<string, UnitType>([
+    ["Digit3", UnitType.Port],
+    ["Digit4", UnitType.City],
+    ["Digit5", UnitType.Factory],
+    ["Digit6", UnitType.DefensePost],
+    ["Digit7", UnitType.SAMLauncher],
+    ["Digit8", UnitType.MissileSilo],
+    ["Digit9", UnitType.Warship],
+    ["Digit0", UnitType.AtomBomb],
+    ["KeyH", UnitType.HydrogenBomb],
+    ["KeyJ", UnitType.ClusterRocket],
+    ["KeyK", UnitType.TacticalRocket],
+    ["KeyL", UnitType.MissileShip],
+  ]);
+
+  private pendingQuickBuild: UnitType | null = null;
+  private lastQuickBuildAttempt: { x: number; y: number } | null = null;
+  private readonly handleQuickBuildFailure = (event: QuickBuildFailedEvent) => {
+    if (this.lastQuickBuildAttempt === null) {
+      return;
+    }
+
+    this.eventBus.emit(new MouseUpEvent(event.x, event.y));
+    this.lastQuickBuildAttempt = null;
+  };
 
   private readonly PAN_SPEED = 5;
   private readonly ZOOM_SPEED = 10;
@@ -184,6 +225,9 @@ export class InputHandler {
     window.addEventListener("pointermove", this.onPointerMove.bind(this));
     this.canvas.addEventListener("contextmenu", (e) => this.onContextMenu(e));
     window.addEventListener("mousemove", (e) => {
+      this.lastPointerX = e.clientX;
+      this.lastPointerY = e.clientY;
+      this.pointerPositionKnown = true;
       if (e.movementX || e.movementY) {
         this.eventBus.emit(new MouseMoveEvent(e.clientX, e.clientY));
       }
@@ -289,9 +333,23 @@ export class InputHandler {
           "ControlRight",
           "ShiftLeft",
           "ShiftRight",
-        ].includes(e.code)
+        ].includes(e.code) ||
+        this.quickBuildHotkeys.has(e.code)
       ) {
         this.activeKeys.add(e.code);
+      }
+
+      if (this.quickBuildHotkeys.has(e.code)) {
+        e.preventDefault();
+        if (!e.repeat && this.pointerPositionKnown) {
+          const quickBuildType = this.quickBuildHotkeys.get(e.code)!;
+          this.triggerQuickBuild(
+            quickBuildType,
+            this.lastPointerX,
+            this.lastPointerY,
+          );
+          this.activeKeys.delete(e.code);
+        }
       }
     });
     window.addEventListener("keyup", (e) => {
@@ -341,9 +399,13 @@ export class InputHandler {
 
       this.activeKeys.delete(e.code);
     });
+
+    this.eventBus.on(QuickBuildFailedEvent, this.handleQuickBuildFailure);
   }
 
   private onPointerDown(event: PointerEvent) {
+    this.lastQuickBuildAttempt = null;
+
     if (event.button === 1) {
       event.preventDefault();
       this.eventBus.emit(new AutoUpgradeEvent(event.clientX, event.clientY));
@@ -354,12 +416,16 @@ export class InputHandler {
       return;
     }
 
+    this.pendingQuickBuild =
+      event.pointerType === "touch" ? null : this.getActiveQuickBuildUnitType();
+
     this.pointerDown = true;
     this.pointers.set(event.pointerId, event);
 
     if (this.pointers.size === 1) {
       this.lastPointerX = event.clientX;
       this.lastPointerY = event.clientY;
+      this.pointerPositionKnown = true;
 
       this.lastPointerDownX = event.clientX;
       this.lastPointerDownY = event.clientY;
@@ -379,8 +445,16 @@ export class InputHandler {
     if (event.button > 0) {
       return;
     }
+
+    const quickBuildCandidate =
+      event.pointerType === "touch" ? null : this.pendingQuickBuild;
+    this.pendingQuickBuild = null;
     this.pointerDown = false;
     this.pointers.clear();
+
+    this.pointerPositionKnown = true;
+    this.lastPointerX = event.clientX;
+    this.lastPointerY = event.clientY;
 
     if (this.isModifierKeyPressed(event)) {
       this.eventBus.emit(new ShowBuildMenuEvent(event.clientX, event.clientY));
@@ -395,6 +469,15 @@ export class InputHandler {
       Math.abs(event.x - this.lastPointerDownX) +
       Math.abs(event.y - this.lastPointerDownY);
     if (dist < 10) {
+      if (event.pointerType !== "touch") {
+        const quickBuildType =
+          quickBuildCandidate ?? this.getActiveQuickBuildUnitType();
+        if (quickBuildType !== null) {
+          this.triggerQuickBuild(quickBuildType, event.clientX, event.clientY);
+          return;
+        }
+      }
+
       if (event.pointerType === "touch") {
         this.eventBus.emit(new ContextMenuEvent(event.clientX, event.clientY));
         event.preventDefault();
@@ -461,6 +544,9 @@ export class InputHandler {
     this.pointers.set(event.pointerId, event);
 
     if (!this.pointerDown) {
+      this.lastPointerX = event.clientX;
+      this.lastPointerY = event.clientY;
+      this.pointerPositionKnown = true;
       this.eventBus.emit(new MouseOverEvent(event.clientX, event.clientY));
       return;
     }
@@ -473,6 +559,7 @@ export class InputHandler {
 
       this.lastPointerX = event.clientX;
       this.lastPointerY = event.clientY;
+      this.pointerPositionKnown = true;
     } else if (this.pointers.size === 2) {
       const currentPinchDistance = this.getPinchDistance();
       const pinchDelta = currentPinchDistance - this.lastPinchDistance;
@@ -548,11 +635,36 @@ export class InputHandler {
     };
   }
 
+  private getActiveQuickBuildUnitType(): UnitType | null {
+    for (const [code, unitType] of this.quickBuildHotkeys) {
+      if (this.activeKeys.has(code)) {
+        return unitType;
+      }
+    }
+    return null;
+  }
+
+  private triggerQuickBuild(
+    unitType: UnitType,
+    clientX: number,
+    clientY: number,
+  ) {
+    this.lastQuickBuildAttempt = {
+      x: clientX,
+      y: clientY,
+    };
+    this.eventBus.emit(new QuickBuildEvent(unitType, clientX, clientY));
+  }
+
   destroy() {
     if (this.moveInterval !== null) {
       clearInterval(this.moveInterval);
     }
+    this.eventBus.off(QuickBuildFailedEvent, this.handleQuickBuildFailure);
     this.activeKeys.clear();
+    this.pendingQuickBuild = null;
+    this.lastQuickBuildAttempt = null;
+    this.pointerPositionKnown = false;
   }
 
   isModifierKeyPressed(event: PointerEvent): boolean {

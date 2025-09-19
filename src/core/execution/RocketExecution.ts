@@ -1,0 +1,306 @@
+import {
+  Execution,
+  Game,
+  isStructureType,
+  Player,
+  TrajectoryTile,
+  Unit,
+  UnitType,
+} from "../game/Game";
+import { TileRef } from "../game/GameMap";
+import { ParabolaPathFinder } from "../pathfinding/PathFinding";
+import { PseudoRandom } from "../PseudoRandom";
+import { NukeType } from "../StatsSchemas";
+
+type RocketUnitType = UnitType.ClusterRocket | UnitType.TacticalRocket;
+
+type RocketConfig = {
+  speed: number;
+  blastRadius: number;
+  troopDamage: number;
+  bursts: { min: number; max: number };
+  spread: number;
+};
+
+const rocketConfig: Record<RocketUnitType, RocketConfig> = {
+  [UnitType.ClusterRocket]: {
+    speed: 8,
+    blastRadius: 1,
+    troopDamage: 300,
+    bursts: { min: 5, max: 10 },
+    spread: 6,
+  },
+  [UnitType.TacticalRocket]: {
+    speed: 12,
+    blastRadius: 1,
+    troopDamage: 450,
+    bursts: { min: 1, max: 1 },
+    spread: 0,
+  },
+};
+
+export class RocketExecution implements Execution {
+  private active = true;
+  private mg: Game;
+  private rocket: Unit | null = null;
+  private carrier: Unit | null = null;
+  private pathFinder: ParabolaPathFinder;
+  private random: PseudoRandom;
+
+  constructor(
+    private readonly rocketType: RocketUnitType,
+    private player: Player,
+    private readonly dst: TileRef,
+    private src?: TileRef | null,
+  ) {}
+
+  init(mg: Game, ticks: number): void {
+    this.mg = mg;
+    this.pathFinder = new ParabolaPathFinder(mg);
+    this.random = new PseudoRandom(mg.ticks());
+  }
+
+  tick(ticks: number): void {
+    if (this.rocket === null) {
+      const spawn = this.src ?? this.player.canBuild(this.rocketType, this.dst);
+      if (spawn === false) {
+        console.warn(`cannot build rocket ${this.rocketType}`);
+        this.active = false;
+        return;
+      }
+      this.src = spawn;
+      this.carrier ??= this.findCarrier(spawn);
+      if (this.carrier === null) {
+        console.warn(`no missile ship available for ${this.rocketType}`);
+        this.active = false;
+        return;
+      }
+      if (this.carrier.isInCooldown()) {
+        console.warn(`missile ship on cooldown for ${this.rocketType}`);
+        this.active = false;
+        return;
+      }
+      const config = rocketConfig[this.rocketType];
+      this.pathFinder.computeControlPoints(spawn, this.dst, config.speed, true);
+      this.rocket = this.player.buildUnit(this.rocketType, spawn, {
+        targetTile: this.dst,
+        trajectory: this.getTrajectory(this.dst),
+      });
+
+      this.carrier.launch();
+
+      if (this.mg.hasOwner(this.dst)) {
+        const target = this.mg.owner(this.dst);
+        if (target.isPlayer()) {
+          this.mg
+            .stats()
+            .bombLaunch(this.player, target, this.rocketType as NukeType);
+        }
+      }
+      return;
+    }
+
+    if (!this.rocket.isActive()) {
+      this.active = false;
+      return;
+    }
+
+    const config = rocketConfig[this.rocketType];
+    const nextTile = this.pathFinder.nextTile(config.speed);
+    if (nextTile === true) {
+      this.detonate();
+      return;
+    } else {
+      this.updateRocketTargetable();
+      this.rocket.move(nextTile);
+      this.rocket.setTrajectoryIndex(this.pathFinder.currentIndex());
+    }
+  }
+
+  private getTrajectory(target: TileRef): TrajectoryTile[] {
+    const trajectoryTiles: TrajectoryTile[] = [];
+    const targetRangeSquared =
+      this.mg.config().defaultNukeTargetableRange() ** 2;
+    const allTiles: TileRef[] = this.pathFinder.allTiles();
+    for (const tile of allTiles) {
+      trajectoryTiles.push({
+        tile,
+        targetable: this.isTargetable(target, tile, targetRangeSquared),
+      });
+    }
+
+    return trajectoryTiles;
+  }
+
+  private isTargetable(
+    targetTile: TileRef,
+    rocketTile: TileRef,
+    targetRangeSquared: number,
+  ): boolean {
+    return (
+      this.mg.euclideanDistSquared(rocketTile, targetTile) <
+        targetRangeSquared ||
+      (this.src !== undefined &&
+        this.src !== null &&
+        this.mg.euclideanDistSquared(this.src, rocketTile) < targetRangeSquared)
+    );
+  }
+
+  private updateRocketTargetable() {
+    if (this.rocket === null || this.rocket.targetTile() === undefined) {
+      return;
+    }
+    const targetRangeSquared =
+      this.mg.config().defaultNukeTargetableRange() ** 2;
+    const targetTile = this.rocket.targetTile();
+    this.rocket.setTargetable(
+      this.isTargetable(targetTile!, this.rocket.tile(), targetRangeSquared),
+    );
+  }
+
+  private detonate() {
+    if (this.rocket === null) {
+      throw new Error("Rocket not initialized");
+    }
+
+    const config = rocketConfig[this.rocketType];
+    const blasts: TileRef[] = [];
+    const seen = new Set<TileRef>();
+    const addBlast = (tile: TileRef) => {
+      if (seen.has(tile)) {
+        return;
+      }
+      seen.add(tile);
+      blasts.push(tile);
+    };
+
+    addBlast(this.dst);
+
+    const totalBlasts = this.randomBurstCount(config);
+    const baseX = this.mg.x(this.dst);
+    const baseY = this.mg.y(this.dst);
+
+    if (config.spread > 0) {
+      let attempts = 0;
+      const maxAttempts = totalBlasts * 8;
+      while (blasts.length < totalBlasts && attempts < maxAttempts) {
+        attempts++;
+        const distance = this.random.nextFloat(0, config.spread);
+        const angle = this.random.nextFloat(0, Math.PI * 2);
+        const offsetX = Math.round(Math.cos(angle) * distance);
+        const offsetY = Math.round(Math.sin(angle) * distance);
+        if (offsetX === 0 && offsetY === 0) {
+          continue;
+        }
+        const x = baseX + offsetX;
+        const y = baseY + offsetY;
+        if (!this.mg.isValidCoord(x, y)) {
+          continue;
+        }
+        addBlast(this.mg.ref(x, y));
+      }
+    }
+
+    if (this.rocket.tile() !== this.dst) {
+      this.rocket.move(this.dst);
+    }
+    this.rocket.setPayloadTiles(blasts);
+
+    for (const blast of blasts) {
+      this.applyBlast(blast, config.blastRadius, config.troopDamage);
+    }
+
+    this.redrawBuildings(config.blastRadius + 4, blasts);
+
+    this.active = false;
+    this.rocket.setReachedTarget();
+    this.rocket.delete(false);
+
+    if (this.mg.hasOwner(this.dst)) {
+      const target = this.mg.owner(this.dst);
+      if (target.isPlayer()) {
+        this.mg
+          .stats()
+          .bombLand(this.player, target, this.rocketType as NukeType);
+      }
+    }
+  }
+
+  private applyBlast(center: TileRef, radius: number, troopDamage: number) {
+    const radiusSquared = radius * radius;
+    const tiles = this.mg.bfs(center, (gm, tile) => {
+      return gm.euclideanDistSquared(center, tile) <= radiusSquared;
+    });
+
+    for (const tile of tiles) {
+      if (!this.mg.hasOwner(tile)) {
+        continue;
+      }
+      const owner = this.mg.owner(tile);
+      if (owner.isPlayer()) {
+        owner.removeTroops(Math.min(troopDamage, owner.troops()));
+      }
+    }
+
+    for (const unit of this.mg.units()) {
+      if (
+        unit.type() === UnitType.ClusterRocket ||
+        unit.type() === UnitType.TacticalRocket ||
+        unit.type() === UnitType.MIRVWarhead ||
+        unit.type() === UnitType.MIRV
+      ) {
+        continue;
+      }
+      if (this.mg.euclideanDistSquared(center, unit.tile()) <= radiusSquared) {
+        unit.delete(true, this.player);
+      }
+    }
+  }
+
+  private redrawBuildings(range: number, centers: TileRef[]) {
+    const rangeSquared = range * range;
+    for (const unit of this.mg.units()) {
+      if (!isStructureType(unit.type())) {
+        continue;
+      }
+      for (const center of centers) {
+        if (this.mg.euclideanDistSquared(center, unit.tile()) < rangeSquared) {
+          unit.touch();
+          break;
+        }
+      }
+    }
+  }
+
+  private randomBurstCount(config: RocketConfig): number {
+    const { min, max } = config.bursts;
+    if (min >= max) {
+      return Math.max(min, 1);
+    }
+    return this.random.nextInt(min, max + 1);
+  }
+
+  private findCarrier(spawn: TileRef): Unit | null {
+    const carriers = this.player
+      .units(UnitType.MissileShip)
+      .filter(
+        (ship) =>
+          ship.isActive() &&
+          ship.tile() === spawn &&
+          ship.owner() === this.player,
+      );
+    return carriers[0] ?? null;
+  }
+
+  owner(): Player {
+    return this.player;
+  }
+
+  isActive(): boolean {
+    return this.active;
+  }
+
+  activeDuringSpawnPhase(): boolean {
+    return false;
+  }
+}

@@ -915,12 +915,17 @@ export class PlayerImpl implements Player {
       case UnitType.AtomBomb:
       case UnitType.HydrogenBomb:
         return this.nukeSpawn(targetTile);
+      case UnitType.ClusterRocket:
+      case UnitType.TacticalRocket:
+        return this.missileStrikeSpawn(targetTile);
       case UnitType.MIRVWarhead:
         return targetTile;
       case UnitType.Port:
         return this.portSpawn(targetTile, validTiles);
       case UnitType.Warship:
         return this.warshipSpawn(targetTile);
+      case UnitType.MissileShip:
+        return this.missileShipSpawn(targetTile);
       case UnitType.Shell:
       case UnitType.SAMMissile:
         return targetTile;
@@ -1166,8 +1171,27 @@ export class PlayerImpl implements Player {
           }
         }
       }
+    }
+    return false;
+  }
+
+  missileShipSpawn(tile: TileRef): TileRef | false {
+    return this.warshipSpawn(tile);
+  }
+
+  missileStrikeSpawn(targetTile: TileRef): TileRef | false {
+    const carriers = this.units(UnitType.MissileShip)
+      .filter((ship) => ship.isActive() && !ship.isInCooldown())
+      .sort(
+        (a, b) =>
+          this.mg.manhattanDist(a.tile(), targetTile) -
+          this.mg.manhattanDist(b.tile(), targetTile),
+      );
+    if (carriers.length === 0) {
       return false;
     }
+
+    return carriers[0].tile();
   }
 
   bestTransportShipSpawn(targetTile: TileRef): TileRef | false {

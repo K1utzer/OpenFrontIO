@@ -307,36 +307,44 @@ export const infoMenuElement: MenuElement = {
 };
 
 function getAllEnabledUnits(myPlayer: boolean, config: Config): Set<UnitType> {
-  const Units: Set<UnitType> = new Set<UnitType>();
+  const units: Set<UnitType> = new Set<UnitType>();
 
-  const addStructureIfEnabled = (unitType: UnitType) => {
+  const addUnitIfEnabled = (unitType: UnitType) => {
     if (!config.isUnitDisabled(unitType)) {
-      Units.add(unitType);
+      units.add(unitType);
     }
   };
 
   if (myPlayer) {
-    addStructureIfEnabled(UnitType.City);
-    addStructureIfEnabled(UnitType.DefensePost);
-    addStructureIfEnabled(UnitType.Port);
-    addStructureIfEnabled(UnitType.MissileSilo);
-    addStructureIfEnabled(UnitType.SAMLauncher);
-    addStructureIfEnabled(UnitType.Factory);
-  } else {
-    addStructureIfEnabled(UnitType.Warship);
-    addStructureIfEnabled(UnitType.HydrogenBomb);
-    addStructureIfEnabled(UnitType.MIRV);
-    addStructureIfEnabled(UnitType.AtomBomb);
+    addUnitIfEnabled(UnitType.City);
+    addUnitIfEnabled(UnitType.DefensePost);
+    addUnitIfEnabled(UnitType.Port);
+    addUnitIfEnabled(UnitType.MissileSilo);
+    addUnitIfEnabled(UnitType.SAMLauncher);
+    addUnitIfEnabled(UnitType.Factory);
   }
 
-  return Units;
+  [
+    UnitType.AtomBomb,
+    UnitType.ClusterRocket,
+    UnitType.TacticalRocket,
+    UnitType.HydrogenBomb,
+    UnitType.MIRV,
+    UnitType.Warship,
+    UnitType.MissileShip,
+  ].forEach(addUnitIfEnabled);
+
+  return units;
 }
 
 const ATTACK_UNIT_TYPES: UnitType[] = [
   UnitType.AtomBomb,
+  UnitType.ClusterRocket,
+  UnitType.TacticalRocket,
   UnitType.MIRV,
   UnitType.HydrogenBomb,
   UnitType.Warship,
+  UnitType.MissileShip,
 ];
 
 function createMenuElements(
