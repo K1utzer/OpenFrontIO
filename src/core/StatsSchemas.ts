@@ -6,16 +6,22 @@ export const BombUnitSchema = z.union([
   z.literal("hbomb"),
   z.literal("mirv"),
   z.literal("mirvw"),
+  z.literal("cluster"),
+  z.literal("tact"),
 ]);
 export type BombUnit = z.infer<typeof BombUnitSchema>;
 export type NukeType =
   | UnitType.AtomBomb
+  | UnitType.ClusterRocket
+  | UnitType.TacticalRocket
   | UnitType.HydrogenBomb
   | UnitType.MIRV
   | UnitType.MIRVWarhead;
 
 export const unitTypeToBombUnit = {
   [UnitType.AtomBomb]: "abomb",
+  [UnitType.ClusterRocket]: "cluster",
+  [UnitType.TacticalRocket]: "tact",
   [UnitType.HydrogenBomb]: "hbomb",
   [UnitType.MIRV]: "mirv",
   [UnitType.MIRVWarhead]: "mirvw",
@@ -35,6 +41,7 @@ export const OtherUnitSchema = z.union([
   z.literal("defp"),
   z.literal("port"),
   z.literal("wshp"),
+  z.literal("mshp"),
   z.literal("silo"),
   z.literal("saml"),
   z.literal("fact"),
@@ -47,6 +54,7 @@ export type OtherUnitType =
   | UnitType.Port
   | UnitType.SAMLauncher
   | UnitType.Warship
+  | UnitType.MissileShip
   | UnitType.Factory;
 
 export const unitTypeToOtherUnit = {
@@ -56,6 +64,7 @@ export const unitTypeToOtherUnit = {
   [UnitType.Port]: "port",
   [UnitType.SAMLauncher]: "saml",
   [UnitType.Warship]: "wshp",
+  [UnitType.MissileShip]: "mshp",
   [UnitType.Factory]: "fact",
 } as const satisfies Record<OtherUnitType, OtherUnit>;
 
