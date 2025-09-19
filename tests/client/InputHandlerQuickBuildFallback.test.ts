@@ -94,5 +94,4 @@ describe("InputHandler quick build fallback", () => {
     handler.destroy();
     jest.useRealTimers();
   });
-
 });
