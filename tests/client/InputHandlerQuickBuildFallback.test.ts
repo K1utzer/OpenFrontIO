@@ -66,4 +66,33 @@ describe("InputHandler quick build fallback", () => {
     handler.destroy();
     jest.useRealTimers();
   });
+
+  it("emits quick build events for missile hotkeys", () => {
+    jest.useFakeTimers();
+
+    const canvas = document.createElement("canvas");
+    const eventBus = new EventBus();
+    const handler = new InputHandler(canvas, eventBus);
+    handler.initialize();
+
+    const internal = handler as unknown as {
+      onPointerMove: (event: PointerEvent) => void;
+    };
+
+    const pointerMove = createPointerEvent({ x: 80, y: 90 });
+    internal.onPointerMove(pointerMove);
+
+    const emitSpy = jest.spyOn(eventBus, "emit");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyJ" }));
+
+    const quickBuildCall = emitSpy.mock.calls.find(
+      ([event]) => event instanceof QuickBuildEvent,
+    );
+    expect(quickBuildCall).toBeDefined();
+
+    handler.destroy();
+    jest.useRealTimers();
+  });
+
 });

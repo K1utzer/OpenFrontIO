@@ -84,7 +84,7 @@ export class HelpModal extends LitElement {
               <tr>
                 <td>
                   <div class="scroll-combo-horizontal">
-                    <span class="key">3-9, 0, H</span>
+                    <span class="key">3-9, 0, H, J, K, L</span>
                   </div>
                 </td>
                 <td>${translateText("help_modal.action_quick_build")}</td>

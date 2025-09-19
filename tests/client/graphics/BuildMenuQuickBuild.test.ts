@@ -38,7 +38,10 @@ jest.mock("../../../src/client/Transport", () => ({
   },
 }));
 
-import { BuildMenu } from "../../../src/client/graphics/layers/BuildMenu";
+import {
+  BuildMenu,
+  flattenedBuildTable,
+} from "../../../src/client/graphics/layers/BuildMenu";
 import {
   QuickBuildEvent,
   QuickBuildFailedEvent,
@@ -154,5 +157,11 @@ describe("BuildMenu quick build", () => {
     const failureEvent = failureCall![0] as QuickBuildFailedEvent;
     expect(failureEvent.x).toBe(10);
     expect(failureEvent.y).toBe(20);
+  });
+  it("includes missile ship and rockets in the build table", () => {
+    const unitTypes = flattenedBuildTable.map((entry) => entry.unitType);
+    expect(unitTypes).toContain(UnitType.MissileShip);
+    expect(unitTypes).toContain(UnitType.ClusterRocket);
+    expect(unitTypes).toContain(UnitType.TacticalRocket);
   });
 });
