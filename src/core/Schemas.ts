@@ -1,6 +1,6 @@
 import { z } from "zod";
-import quickChatData from "../../resources/QuickChat.json" with { type: "json" };
-import countries from "../client/data/countries.json" with { type: "json" };
+import quickChatDataJson from "../../resources/QuickChat.json";
+import countriesJson from "../client/data/countries.json";
 import { PatternSchema } from "./CosmeticSchemas";
 import {
   AllPlayers,
@@ -193,6 +193,21 @@ export const ID = z
 export const AllPlayersStatsSchema = z.record(ID, PlayerStatsSchema);
 
 export const UsernameSchema = SafeString;
+type CountryData = {
+  code: string;
+  restricted?: boolean;
+};
+
+type QuickChatEntry = {
+  key: string;
+  requiresPlayer: boolean;
+};
+
+type QuickChatData = Record<string, QuickChatEntry[]>;
+
+const countries = countriesJson as CountryData[];
+const quickChatData = quickChatDataJson as QuickChatData;
+
 const countryCodes = countries.filter((c) => !c.restricted).map((c) => c.code);
 export const FlagSchema = z
   .string()
