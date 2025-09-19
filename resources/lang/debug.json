@@ -21,6 +21,7 @@
     "action_alt_view": "help_modal.action_alt_view",
     "action_attack_altclick": "help_modal.action_attack_altclick",
     "action_build": "help_modal.action_build",
+    "action_quick_build": "help_modal.action_quick_build",
     "action_center": "help_modal.action_center",
     "action_zoom": "help_modal.action_zoom",
     "action_move_camera": "help_modal.action_move_camera",

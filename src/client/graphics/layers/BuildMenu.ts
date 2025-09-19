@@ -24,6 +24,8 @@ import { GameView } from "../../../core/game/GameView";
 import {
   CloseViewEvent,
   MouseDownEvent,
+  QuickBuildEvent,
+  QuickBuildFailedEvent,
   ShowBuildMenuEvent,
   ShowEmojiMenuEvent,
 } from "../../InputHandler";
@@ -152,6 +154,9 @@ export class BuildMenu extends LitElement implements Layer {
       }
       const tile = this.game.ref(clickedCell.x, clickedCell.y);
       this.showMenu(tile);
+    });
+    this.eventBus.on(QuickBuildEvent, (e) => {
+      void this.handleQuickBuild(e);
     });
     this.eventBus.on(CloseViewEvent, () => this.hideMenu());
     this.eventBus.on(ShowEmojiMenuEvent, () => this.hideMenu());
@@ -478,6 +483,63 @@ export class BuildMenu extends LitElement implements Layer {
     this.clickedTile = clickedTile;
     this._hidden = false;
     this.refresh();
+  }
+
+  private async handleQuickBuild(event: QuickBuildEvent) {
+    if (!this.game?.myPlayer()?.isAlive()) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    if (this.game?.config()?.isUnitDisabled(event.unitType)) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    const clickedCell = this.transformHandler.screenToWorldCoordinates(
+      event.x,
+      event.y,
+    );
+    if (clickedCell === null) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+    if (!this.game.isValidCoord(clickedCell.x, clickedCell.y)) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    const tile = this.game.ref(clickedCell.x, clickedCell.y);
+    const player = this.game.myPlayer();
+    if (!player) {
+      this.emitQuickBuildFailure(event);
+      return;
+    }
+
+    try {
+      const actions = await player.actions(tile);
+      const buildableUnit = actions.buildableUnits.find(
+        (unit) => unit.type === event.unitType,
+      );
+
+      if (
+        !buildableUnit ||
+        (buildableUnit.canBuild === false && buildableUnit.canUpgrade === false)
+      ) {
+        this.emitQuickBuildFailure(event);
+        return;
+      }
+
+      this.playerActions = actions;
+      this.sendBuildOrUpgrade(buildableUnit, tile);
+    } catch (error) {
+      console.error("Failed to handle quick build", error);
+      this.emitQuickBuildFailure(event);
+    }
+  }
+
+  private emitQuickBuildFailure(event: QuickBuildEvent) {
+    this.eventBus.emit(new QuickBuildFailedEvent(event.x, event.y));
   }
 
   private refresh() {
