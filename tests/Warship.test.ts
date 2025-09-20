@@ -1,4 +1,5 @@
 import { MoveWarshipExecution } from "../src/core/execution/MoveWarshipExecution";
+import { ShellExecution } from "../src/core/execution/ShellExecution";
 import { WarshipExecution } from "../src/core/execution/WarshipExecution";
 import {
   Game,
@@ -16,6 +17,54 @@ let player1: Player;
 let player2: Player;
 
 describe("Warship", () => {
+  function countShellExecutions(): number {
+    return game
+      .executions()
+      .filter((exec): exec is ShellExecution => exec instanceof ShellExecution)
+      .length;
+  }
+
+  function oceanTileToTheRight(startX: number, y: number, minOffset: number) {
+    let fallback: ReturnType<typeof game.ref> | undefined;
+    for (let offset = 1; offset < game.width(); offset++) {
+      if (startX + offset < game.width()) {
+        const rightTile = game.ref(startX + offset, y);
+        if (game.isOcean(rightTile)) {
+          if (offset >= minOffset) {
+            return rightTile;
+          }
+          fallback = rightTile;
+        }
+      }
+      if (startX - offset >= 0) {
+        const leftTile = game.ref(startX - offset, y);
+        if (game.isOcean(leftTile)) {
+          if (offset >= minOffset) {
+            return leftTile;
+          }
+          fallback = leftTile;
+        }
+      }
+    }
+    if (fallback !== undefined) {
+      return fallback;
+    }
+    throw new Error("Failed to find ocean tile to the right");
+  }
+
+  function tickUntilShellCountAtLeast(
+    expected: number,
+    maxTicks: number = 200,
+  ) {
+    for (let i = 0; i < maxTicks; i++) {
+      if (countShellExecutions() >= expected) {
+        return;
+      }
+      executeTicks(game, 1);
+    }
+    throw new Error(`Expected at least ${expected} shell executions`);
+  }
+
   beforeEach(async () => {
     game = await setup(
       "half_land_half_ocean",
@@ -246,5 +295,58 @@ describe("Warship", () => {
     exec.init(game, 0);
 
     expect(exec.isActive()).toBe(false);
+  });
+
+  test("Warship fires two shells per volley", async () => {
+    const portTile = game.ref(coastX, 10);
+    player1.buildUnit(UnitType.Port, portTile, {});
+
+    const patrolTile = game.ref(coastX + 1, 10);
+    const warship = player1.buildUnit(UnitType.Warship, patrolTile, {
+      patrolTile,
+    });
+    game.addExecution(new WarshipExecution(warship));
+
+    const targetTile = oceanTileToTheRight(coastX, 10, 10);
+    player2.buildUnit(UnitType.Warship, targetTile, { patrolTile: targetTile });
+
+    const warmup = game.config().warshipShellAttackRate() + 5;
+    executeTicks(game, warmup);
+    tickUntilShellCountAtLeast(1);
+    const afterFirstShot = countShellExecutions();
+    expect(afterFirstShot).toBeGreaterThanOrEqual(1);
+
+    executeTicks(game, 1);
+    const afterSecondShot = countShellExecutions();
+    expect(afterSecondShot).toBeGreaterThanOrEqual(2);
+  });
+
+  test("Missile warship fires a single shell per volley", async () => {
+    const portTile = game.ref(coastX, 10);
+    player1.buildUnit(UnitType.Port, portTile, {});
+
+    const patrolTile = game.ref(coastX + 1, 10);
+    const missileShip = player1.buildUnit(UnitType.MissileShip, patrolTile, {
+      patrolTile,
+    });
+    game.addExecution(
+      new WarshipExecution(missileShip, {
+        unitType: UnitType.MissileShip,
+        shellVolleySize: 1,
+      }),
+    );
+
+    const targetTile = oceanTileToTheRight(coastX, 10, 10);
+    player2.buildUnit(UnitType.Warship, targetTile, { patrolTile: targetTile });
+
+    const warmup = game.config().warshipShellAttackRate() + 5;
+    executeTicks(game, warmup);
+    tickUntilShellCountAtLeast(1);
+    const afterFirstShot = countShellExecutions();
+    expect(afterFirstShot).toBeGreaterThanOrEqual(1);
+
+    executeTicks(game, 1);
+    const afterSecondTick = countShellExecutions();
+    expect(afterSecondTick).toBeLessThanOrEqual(1);
   });
 });

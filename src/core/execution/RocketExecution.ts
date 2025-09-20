@@ -77,26 +77,24 @@ export class RocketExecution implements Execution {
 
   tick(ticks: number): void {
     if (this.rocket === null) {
-      let spawn: TileRef | false;
+      let spawn: TileRef;
       if (this.options.skipSpawnChecks) {
-        if (this.src === undefined || this.src === null) {
+        const source = this.src;
+        if (source === undefined || source === null) {
           console.warn(`missing spawn tile for rocket ${this.rocketType}`);
           this.active = false;
           return;
         }
-        spawn = this.src;
+        spawn = source;
       } else {
-        spawn = this.src ?? this.player.canBuild(this.rocketType, this.dst);
-        if (spawn === false) {
+        const spawnResult =
+          this.src ?? this.player.canBuild(this.rocketType, this.dst);
+        if (spawnResult === false) {
           console.warn(`cannot build rocket ${this.rocketType}`);
           this.active = false;
           return;
         }
-      }
-      if (spawn === false) {
-        console.warn(`cannot determine spawn for rocket ${this.rocketType}`);
-        this.active = false;
-        return;
+        spawn = spawnResult;
       }
       this.src = spawn;
       if (!this.options.skipSpawnChecks) {

@@ -126,7 +126,7 @@ export class ConstructionExecution implements Execution {
         this.mg.addExecution(
           new WarshipExecution(
             { owner: player, patrolTile: this.tile },
-            { unitType: UnitType.MissileShip, allowShells: false },
+            { unitType: UnitType.MissileShip, shellVolleySize: 1 },
           ),
         );
         break;
