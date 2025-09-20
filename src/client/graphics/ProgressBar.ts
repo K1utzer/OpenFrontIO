@@ -58,4 +58,15 @@ export class ProgressBar {
   getProgress(): number {
     return this.progress;
   }
+
+  setPosition(x: number, y: number): void {
+    if (this.x === x && this.y === y) {
+      return;
+    }
+    const currentProgress = this.progress;
+    this.clear();
+    this.x = x;
+    this.y = y;
+    this.setProgress(currentProgress);
+  }
 }
