@@ -89,7 +89,7 @@ function prepareMissileShip(): {
   game.addExecution(
     new WarshipExecution(missileShip, {
       unitType: UnitType.MissileShip,
-      allowShells: false,
+      shellVolleySize: 1,
     }),
   );
   return {
