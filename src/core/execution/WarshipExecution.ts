@@ -16,6 +16,7 @@ import { ShellExecution } from "./ShellExecution";
 interface WarshipExecutionOptions {
   unitType: UnitType.Warship | UnitType.MissileShip;
   allowShells: boolean;
+  shellVolleySize: number;
 }
 
 export class WarshipExecution implements Execution {
@@ -26,6 +27,9 @@ export class WarshipExecution implements Execution {
   private lastShellAttack = 0;
   private alreadySentShell = new Set<Unit>();
   private config: WarshipExecutionOptions;
+  private shellVolleySize: number;
+  private shellVolleyProvided: boolean;
+  private shellsRemainingInVolley = 0;
 
   constructor(
     private input: (UnitParams<UnitType.Warship> & OwnerComp) | Unit,
@@ -34,8 +38,11 @@ export class WarshipExecution implements Execution {
     this.config = {
       unitType: UnitType.Warship,
       allowShells: true,
+      shellVolleySize: 2,
       ...options,
     };
+    this.shellVolleyProvided = options?.shellVolleySize !== undefined;
+    this.shellVolleySize = Math.max(1, Math.floor(this.config.shellVolleySize));
   }
 
   init(mg: Game, ticks: number): void {
@@ -63,6 +70,14 @@ export class WarshipExecution implements Execution {
         spawn,
         this.input,
       );
+    }
+
+    if (
+      !this.shellVolleyProvided &&
+      this.config.unitType === UnitType.MissileShip
+    ) {
+      this.shellVolleySize = 1;
+      this.config.shellVolleySize = this.shellVolleySize;
     }
   }
 
@@ -207,25 +222,52 @@ export class WarshipExecution implements Execution {
       return;
     }
     const shellAttackRate = this.mg.config().warshipShellAttackRate();
-    if (this.mg.ticks() - this.lastShellAttack > shellAttackRate) {
-      if (this.warship.targetUnit()?.type() !== UnitType.TransportShip) {
-        // Warships don't need to reload when attacking transport ships.
-        this.lastShellAttack = this.mg.ticks();
-      }
-      this.mg.addExecution(
-        new ShellExecution(
-          this.warship.tile(),
-          this.warship.owner(),
-          this.warship,
-          this.warship.targetUnit()!,
-        ),
-      );
-      if (!this.warship.targetUnit()!.hasHealth()) {
-        // Don't send multiple shells to target that can be oneshotted
-        this.alreadySentShell.add(this.warship.targetUnit()!);
-        this.warship.setTargetUnit(undefined);
+    const target = this.warship.targetUnit();
+    if (target === undefined) {
+      return;
+    }
+
+    const volleySize = this.shellVolleySize;
+    if (volleySize <= 0) {
+      return;
+    }
+
+    if (this.shellsRemainingInVolley === 0) {
+      if (
+        target.type() !== UnitType.TransportShip &&
+        this.mg.ticks() - this.lastShellAttack <= shellAttackRate
+      ) {
         return;
       }
+      this.shellsRemainingInVolley = volleySize;
+    }
+
+    if (this.shellsRemainingInVolley <= 0) {
+      return;
+    }
+
+    this.shellsRemainingInVolley--;
+    this.mg.addExecution(
+      new ShellExecution(
+        this.warship.tile(),
+        this.warship.owner(),
+        this.warship,
+        target,
+      ),
+    );
+    if (!target.hasHealth()) {
+      // Don't send multiple shells to target that can be oneshotted
+      this.alreadySentShell.add(target);
+      this.warship.setTargetUnit(undefined);
+      return;
+    }
+
+    if (
+      target.type() !== UnitType.TransportShip &&
+      this.shellsRemainingInVolley === 0
+    ) {
+      // Only start the cooldown once the volley has finished.
+      this.lastShellAttack = this.mg.ticks();
     }
   }
 
