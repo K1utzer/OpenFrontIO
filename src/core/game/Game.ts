@@ -698,6 +698,7 @@ export interface Game extends GameMap {
     predicate?: UnitPredicate,
   ): Array<{ unit: Unit; distSquared: number }>;
 
+  executions(): Execution[];
   addExecution(...exec: Execution[]): void;
   displayMessage(
     message: string,
