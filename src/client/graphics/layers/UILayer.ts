@@ -311,6 +311,15 @@ export class UILayer implements Layer {
         this.allProgressBars.delete(unitId);
         return;
       } else {
+        const tile = progressBarInfo.unit.tile();
+        const targetX = this.game.x(tile) - 6;
+        const targetY = this.game.y(tile) + 6;
+        if (
+          progressBarInfo.progressBar.getX() !== targetX ||
+          progressBarInfo.progressBar.getY() !== targetY
+        ) {
+          progressBarInfo.progressBar.setPosition(targetX, targetY);
+        }
         progressBarInfo.progressBar.setProgress(progress);
       }
     });

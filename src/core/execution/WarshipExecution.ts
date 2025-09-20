@@ -35,12 +35,23 @@ export class WarshipExecution implements Execution {
     private input: (UnitParams<UnitType.Warship> & OwnerComp) | Unit,
     options?: Partial<WarshipExecutionOptions>,
   ) {
+    const resolvedUnitType =
+      options?.unitType ??
+      (isUnit(input)
+        ? (input.type() as UnitType.Warship | UnitType.MissileShip)
+        : undefined) ??
+      UnitType.Warship;
+
     this.config = {
-      unitType: UnitType.Warship,
+      unitType: resolvedUnitType,
       allowShells: true,
-      shellVolleySize: 2,
+      shellVolleySize: resolvedUnitType === UnitType.MissileShip ? 1 : 2,
       ...options,
     };
+    if (resolvedUnitType === UnitType.MissileShip) {
+      this.config.allowShells = true;
+      this.config.shellVolleySize = 1;
+    }
     this.shellVolleyProvided = options?.shellVolleySize !== undefined;
     this.shellVolleySize = Math.max(1, Math.floor(this.config.shellVolleySize));
   }

@@ -22,6 +22,7 @@ type RocketConfig = {
   bursts: { min: number; max: number };
   spread: number;
   minClusterSpacing?: number;
+  airburstDistance?: number;
 };
 
 interface RocketExecutionOptions {
@@ -43,6 +44,7 @@ const rocketConfig: Record<RocketUnitType, RocketConfig> = {
     bursts: { min: 3, max: 5 },
     spread: 26,
     minClusterSpacing: 10,
+    airburstDistance: 6,
   },
   [UnitType.TacticalRocket]: {
     speed: 12,
@@ -145,14 +147,26 @@ export class RocketExecution implements Execution {
     }
 
     const config = rocketConfig[this.rocketType];
+    const canAirburst =
+      this.rocketType === UnitType.ClusterRocket &&
+      !this.options.isClusterBomblet;
+
     const nextTile = this.pathFinder.nextTile(config.speed);
     if (nextTile === true) {
-      this.detonate();
+      if (canAirburst && this.shouldSplitInFlight(config)) {
+        this.splitClusterRocket(config);
+      } else {
+        this.detonate();
+      }
       return;
     } else {
       this.updateRocketTargetable();
       this.rocket.move(nextTile);
       this.rocket.setTrajectoryIndex(this.pathFinder.currentIndex());
+      if (canAirburst && this.shouldSplitInFlight(config)) {
+        this.splitClusterRocket(config);
+        return;
+      }
     }
   }
 
@@ -329,6 +343,31 @@ export class RocketExecution implements Execution {
       return Math.max(min, 1);
     }
     return this.random.nextInt(min, max + 1);
+  }
+
+  private shouldSplitInFlight(config: RocketConfig): boolean {
+    if (
+      this.rocket === null ||
+      config.airburstDistance === undefined ||
+      this.options.isClusterBomblet
+    ) {
+      return false;
+    }
+
+    const rocketTile = this.rocket.tile();
+    if (rocketTile === this.dst) {
+      return false;
+    }
+    if (
+      this.src !== undefined &&
+      this.src !== null &&
+      rocketTile === this.src
+    ) {
+      return false;
+    }
+
+    const distanceSquared = this.mg.euclideanDistSquared(rocketTile, this.dst);
+    return distanceSquared <= config.airburstDistance * config.airburstDistance;
   }
 
   private splitClusterRocket(config: RocketConfig) {
