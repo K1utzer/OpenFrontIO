@@ -228,7 +228,7 @@ export class FxLayer implements Layer {
       if (!unit.reachedTarget()) {
         this.handleSAMInterception(unit);
       } else {
-        this.spawnMiniExplosion(unit.lastTile(), false);
+        this.spawnMiniExplosion(unit.tile(), false);
       }
     }
   }
@@ -259,17 +259,21 @@ export class FxLayer implements Layer {
 
   private handleClusterExplosion(unit: UnitView) {
     const payloadTiles = unit.payloadTiles();
+    if (payloadTiles !== undefined && payloadTiles.length === 0) {
+      return;
+    }
     const tiles =
       payloadTiles !== undefined && payloadTiles.length > 0
         ? payloadTiles
         : [unit.lastTile()];
+    const includeSmoke = payloadTiles !== undefined && payloadTiles.length > 1;
     const seen = new Set<TileRef>();
     for (const tile of tiles) {
       if (seen.has(tile)) {
         continue;
       }
       seen.add(tile);
-      this.spawnMiniExplosion(tile, true);
+      this.spawnMiniExplosion(tile, includeSmoke);
     }
   }
 
