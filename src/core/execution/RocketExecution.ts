@@ -24,6 +24,16 @@ type RocketConfig = {
   minClusterSpacing?: number;
 };
 
+interface RocketExecutionOptions {
+  skipSpawnChecks?: boolean;
+  skipLaunchCooldown?: boolean;
+  skipCost?: boolean;
+  skipStats?: boolean;
+  isClusterBomblet?: boolean;
+}
+
+const CLUSTER_BOMBLET_COUNT = 5;
+
 const rocketConfig: Record<RocketUnitType, RocketConfig> = {
   [UnitType.ClusterRocket]: {
     speed: 8,
@@ -33,7 +43,6 @@ const rocketConfig: Record<RocketUnitType, RocketConfig> = {
     bursts: { min: 3, max: 5 },
     spread: 26,
     minClusterSpacing: 10,
-
   },
   [UnitType.TacticalRocket]: {
     speed: 12,
@@ -57,6 +66,7 @@ export class RocketExecution implements Execution {
     private player: Player,
     private readonly dst: TileRef,
     private src?: TileRef | null,
+    private readonly options: RocketExecutionOptions = {},
   ) {}
 
   init(mg: Game, ticks: number): void {
@@ -67,34 +77,60 @@ export class RocketExecution implements Execution {
 
   tick(ticks: number): void {
     if (this.rocket === null) {
-      const spawn = this.src ?? this.player.canBuild(this.rocketType, this.dst);
+      let spawn: TileRef | false;
+      if (this.options.skipSpawnChecks) {
+        if (this.src === undefined || this.src === null) {
+          console.warn(`missing spawn tile for rocket ${this.rocketType}`);
+          this.active = false;
+          return;
+        }
+        spawn = this.src;
+      } else {
+        spawn = this.src ?? this.player.canBuild(this.rocketType, this.dst);
+        if (spawn === false) {
+          console.warn(`cannot build rocket ${this.rocketType}`);
+          this.active = false;
+          return;
+        }
+      }
       if (spawn === false) {
-        console.warn(`cannot build rocket ${this.rocketType}`);
+        console.warn(`cannot determine spawn for rocket ${this.rocketType}`);
         this.active = false;
         return;
       }
       this.src = spawn;
-      this.carrier ??= this.findCarrier(spawn);
-      if (this.carrier === null) {
-        console.warn(`no missile ship available for ${this.rocketType}`);
-        this.active = false;
-        return;
-      }
-      if (this.carrier.isInCooldown()) {
-        console.warn(`missile ship on cooldown for ${this.rocketType}`);
-        this.active = false;
-        return;
+      if (!this.options.skipSpawnChecks) {
+        this.carrier ??= this.findCarrier(spawn);
+        if (this.carrier === null) {
+          console.warn(`no missile ship available for ${this.rocketType}`);
+          this.active = false;
+          return;
+        }
+        if (this.carrier.isInCooldown()) {
+          console.warn(`missile ship on cooldown for ${this.rocketType}`);
+          this.active = false;
+          return;
+        }
       }
       const config = rocketConfig[this.rocketType];
       this.pathFinder.computeControlPoints(spawn, this.dst, config.speed, true);
+      const goldBefore = this.player.gold();
       this.rocket = this.player.buildUnit(this.rocketType, spawn, {
         targetTile: this.dst,
         trajectory: this.getTrajectory(this.dst),
       });
+      if (this.options.skipCost) {
+        const spentGold = goldBefore - this.player.gold();
+        if (spentGold > 0n) {
+          this.player.addGold(spentGold);
+        }
+      }
 
-      this.carrier.launch();
+      if (!this.options.skipLaunchCooldown && this.carrier !== null) {
+        this.carrier.launch();
+      }
 
-      if (this.mg.hasOwner(this.dst)) {
+      if (!this.options.skipStats && this.mg.hasOwner(this.dst)) {
         const target = this.mg.owner(this.dst);
         if (target.isPlayer()) {
           this.mg
@@ -169,6 +205,15 @@ export class RocketExecution implements Execution {
     }
 
     const config = rocketConfig[this.rocketType];
+
+    if (
+      this.rocketType === UnitType.ClusterRocket &&
+      !this.options.isClusterBomblet
+    ) {
+      this.splitClusterRocket(config);
+      return;
+    }
+
     const blasts: TileRef[] = [];
     const seen = new Set<TileRef>();
     const addBlast = (tile: TileRef) => {
@@ -179,18 +224,15 @@ export class RocketExecution implements Execution {
       blasts.push(tile);
     };
 
-    const totalBlasts = this.randomBurstCount(config);
     if (this.rocketType === UnitType.ClusterRocket) {
-      const clusterTargets = this.generateClusterBlasts(config, totalBlasts);
-      for (const target of clusterTargets) {
-        addBlast(target);
-      }
+      addBlast(this.dst);
     } else {
       addBlast(this.dst);
       const baseX = this.mg.x(this.dst);
       const baseY = this.mg.y(this.dst);
 
       if (config.spread > 0) {
+        const totalBlasts = this.randomBurstCount(config);
         let attempts = 0;
         const maxAttempts = totalBlasts * 8;
         while (blasts.length < totalBlasts && attempts < maxAttempts) {
@@ -227,7 +269,7 @@ export class RocketExecution implements Execution {
     this.rocket.setReachedTarget();
     this.rocket.delete(false);
 
-    if (this.mg.hasOwner(this.dst)) {
+    if (!this.options.skipStats && this.mg.hasOwner(this.dst)) {
       const target = this.mg.owner(this.dst);
       if (target.isPlayer()) {
         this.mg
@@ -291,6 +333,51 @@ export class RocketExecution implements Execution {
     return this.random.nextInt(min, max + 1);
   }
 
+  private splitClusterRocket(config: RocketConfig) {
+    if (this.rocket === null) {
+      throw new Error("Rocket not initialized");
+    }
+
+    const origin = this.rocket.tile();
+    const clusterTargets = this.generateClusterBlasts(
+      config,
+      CLUSTER_BOMBLET_COUNT,
+    );
+
+    for (const target of clusterTargets) {
+      this.mg.addExecution(
+        new RocketExecution(
+          UnitType.ClusterRocket,
+          this.player,
+          target,
+          origin,
+          {
+            skipSpawnChecks: true,
+            skipLaunchCooldown: true,
+            skipCost: true,
+            skipStats: true,
+            isClusterBomblet: true,
+          },
+        ),
+      );
+    }
+
+    this.active = false;
+    this.rocket.setPayloadTiles([]);
+    this.rocket.setReachedTarget();
+    this.rocket.delete(false);
+    this.rocket = null;
+
+    if (!this.options.skipStats && this.mg.hasOwner(this.dst)) {
+      const target = this.mg.owner(this.dst);
+      if (target.isPlayer()) {
+        this.mg
+          .stats()
+          .bombLand(this.player, target, this.rocketType as NukeType);
+      }
+    }
+  }
+
   private generateClusterBlasts(
     config: RocketConfig,
     desiredBlasts: number,
@@ -313,7 +400,6 @@ export class RocketExecution implements Execution {
     const maxAttempts = Math.max(20, desiredBlasts * 60);
 
     const addIfValid = (tile: TileRef | null, enforceSpacing = true) => {
-
       if (tile === null) {
         return false;
       }
@@ -431,10 +517,8 @@ export class RocketExecution implements Execution {
     const maxX = baseX + spread;
     const minY = baseY - spread;
     const maxY = baseY + spread;
-
     const maxLocalAttempts = 80;
     const maxDistanceSquared = spread * spread;
-
 
     for (let tries = 0; tries < maxLocalAttempts; tries++) {
       const x = this.random.nextInt(minX, maxX + 1);
@@ -447,14 +531,12 @@ export class RocketExecution implements Execution {
         continue;
       }
       if (
-
         spread > 0 &&
         this.mg.euclideanDistSquared(tile, this.dst) > maxDistanceSquared
       ) {
         continue;
       }
       if (
-
         targetOwner !== null &&
         targetOwner.isPlayer() &&
         (!this.mg.hasOwner(tile) || this.mg.owner(tile) !== targetOwner)

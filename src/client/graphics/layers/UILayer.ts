@@ -338,6 +338,7 @@ export class UILayer implements Layer {
 
       case UnitType.MissileSilo:
       case UnitType.SAMLauncher:
+      case UnitType.MissileShip:
         return unit.missileReadinesss();
       default:
         return 1;
