@@ -37,6 +37,7 @@ const CLUSTER_BOMBLET_COUNT = 5;
 const rocketConfig: Record<RocketUnitType, RocketConfig> = {
   [UnitType.ClusterRocket]: {
     speed: 8,
+
     blastRadius: 1,
     troopDamage: 350,
     bursts: { min: 3, max: 5 },
